@@ -1,0 +1,8 @@
+node_modules
+.env
+.DS_Store
+
+# Evaluation audio and raw run outputs. Downloaded or generated, never committed:
+# two of the datasets do not allow redistribution.
+eval/data/
+eval/results/

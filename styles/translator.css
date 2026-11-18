@@ -1,0 +1,1291 @@
+/* Class names are looked for in these files only. */
+@import "tailwindcss" source(none);
+@source "../public/index.html";
+@source "../public/voice-translator";
+
+@theme {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-serif: 'Source Serif 4', Georgia, serif;
+
+  --color-background: #F5FAFB;
+  --color-foreground: oklch(0.13 0.02 260);
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.13 0.02 260);
+  --color-popover: oklch(1 0 0);
+  --color-popover-foreground: oklch(0.13 0.02 260);
+  --color-primary: oklch(0.13 0.02 260);
+  --color-primary-foreground: oklch(0.99 0 0);
+  --color-secondary: oklch(0.96 0.005 240);
+  --color-secondary-foreground: oklch(0.13 0.02 260);
+  --color-muted: oklch(0.95 0.005 240);
+  --color-muted-foreground: #4f5661;
+  --color-accent: oklch(0.55 0.15 250);
+  --color-accent-foreground: oklch(0.99 0 0);
+  --color-border: oklch(0.90 0.01 240);
+  --color-input: oklch(0.92 0.005 240);
+  --color-ring: oklch(0.55 0.15 250);
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+}
+
+:root {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-serif: 'Source Serif 4', Georgia, serif;
+  --color-background: #F5FAFB;
+  --color-foreground: oklch(0.13 0.02 260);
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.13 0.02 260);
+  --color-popover: oklch(1 0 0);
+  --color-popover-foreground: oklch(0.13 0.02 260);
+  --color-primary: oklch(0.13 0.02 260);
+  --color-primary-foreground: oklch(0.99 0 0);
+  --color-secondary: oklch(0.96 0.005 240);
+  --color-secondary-foreground: oklch(0.13 0.02 260);
+  --color-muted: oklch(0.95 0.005 240);
+  --color-muted-foreground: #4f5661;
+  --color-accent: oklch(0.55 0.15 250);
+  --color-accent-foreground: oklch(0.99 0 0);
+  --color-border: oklch(0.90 0.01 240);
+  --color-input: oklch(0.92 0.005 240);
+  --color-ring: oklch(0.55 0.15 250);
+}
+
+@layer base {
+
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+/* --- UI Component: Buttons --- */
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.6rem;
+  padding: 0 1.25rem;
+  border-radius: 0.6rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
+  gap: 0.5rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.ui-btn:active {
+  transform: scale(0.98);
+}
+
+.ui-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.ui-btn-primary {
+  background: var(--color-foreground);
+  color: var(--color-background);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.ui-btn-primary:hover:not(:disabled) {
+  opacity: 0.85;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.ui-btn-secondary {
+  background: var(--color-secondary);
+  color: var(--color-foreground);
+}
+
+.ui-btn-secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-secondary) 85%, var(--color-foreground) 15%);
+}
+
+.ui-btn-outline {
+  background: #fff;
+  border-color: var(--color-border);
+  color: var(--color-foreground);
+}
+
+.ui-btn-outline:hover:not(:disabled) {
+  background: var(--color-secondary);
+}
+
+.ui-btn-ghost {
+  background: transparent;
+  color: var(--color-muted-foreground);
+}
+
+.ui-btn-ghost:hover:not(:disabled) {
+  background: var(--color-secondary);
+  color: var(--color-foreground);
+}
+
+.ui-btn-lg {
+  height: 3.2rem;
+  font-size: 1rem;
+  border-radius: 0.8rem;
+  padding: 0 1.5rem;
+}
+
+@layer utilities {
+
+  /* Color utility fallbacks for static HTML mode (when runtime token classes fail). */
+  .bg-card {
+    background-color: var(--color-card);
+  }
+
+  .bg-background {
+    background-color: var(--color-background);
+  }
+
+  .bg-foreground {
+    background-color: var(--color-foreground);
+  }
+
+  .bg-secondary {
+    background-color: var(--color-secondary);
+  }
+
+  .bg-secondary\/20 {
+    background-color: color-mix(in srgb, var(--color-secondary) 20%, transparent);
+  }
+
+  .bg-secondary\/30 {
+    background-color: color-mix(in srgb, var(--color-secondary) 30%, transparent);
+  }
+
+  .bg-secondary\/50 {
+    background-color: color-mix(in srgb, var(--color-secondary) 50%, transparent);
+  }
+
+  .bg-accent {
+    background-color: var(--color-accent);
+  }
+
+  .bg-accent\/10 {
+    background-color: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  }
+
+  .bg-accent\/5 {
+    background-color: color-mix(in srgb, var(--color-accent) 5%, transparent);
+  }
+
+  .bg-accent\/20 {
+    background-color: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  }
+
+  .bg-accent\/60 {
+    background-color: color-mix(in srgb, var(--color-accent) 60%, transparent);
+  }
+
+  .bg-accent\/80 {
+    background-color: color-mix(in srgb, var(--color-accent) 80%, transparent);
+  }
+
+  .ring-accent\/50 {
+    --tw-ring-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
+  }
+
+  .text-foreground {
+    color: var(--color-foreground);
+  }
+
+  .text-background {
+    color: var(--color-background);
+  }
+
+  .text-background\/90 {
+    color: color-mix(in srgb, var(--color-background) 90%, transparent);
+  }
+
+  .text-background\/70 {
+    color: color-mix(in srgb, var(--color-background) 70%, transparent);
+  }
+
+  .text-background\/60 {
+    color: color-mix(in srgb, var(--color-background) 60%, transparent);
+  }
+
+  .text-accent {
+    color: var(--color-accent);
+  }
+
+  .hover\:bg-foreground\/90:hover {
+    background-color: color-mix(in srgb, var(--color-foreground) 90%, transparent);
+  }
+
+  .hover\:bg-background\/90:hover {
+    background-color: color-mix(in srgb, var(--color-background) 90%, transparent);
+  }
+
+  .glass {
+    background-color: color-mix(in srgb, var(--color-card) 80%, transparent);
+    backdrop-filter: blur(24px);
+  }
+
+  .text-gradient {
+    background-clip: text;
+    color: transparent;
+    background-image: linear-gradient(to right, var(--color-foreground), color-mix(in srgb, var(--color-foreground) 70%, transparent));
+  }
+
+  /* Stable utility mapping for helper copy colors on the static landing page */
+  .text-muted-foreground {
+    color: var(--color-muted-foreground);
+  }
+
+  .text-muted-foreground\/70 {
+    color: color-mix(in srgb, var(--color-muted-foreground) 70%, transparent);
+  }
+
+  .text-muted-foreground\/60 {
+    color: color-mix(in srgb, var(--color-muted-foreground) 60%, transparent);
+  }
+
+  .text-muted-foreground\/50 {
+    color: color-mix(in srgb, var(--color-muted-foreground) 50%, transparent);
+  }
+
+  .section-headline {
+    position: relative;
+    z-index: 1;
+  }
+
+  @supports (content-visibility: auto) {
+    [data-deferred-section] {
+      content-visibility: auto;
+      contain-intrinsic-size: 960px;
+    }
+
+    [data-deferred-section="translator"] {
+      contain-intrinsic-size: 1120px;
+    }
+
+    [data-deferred-section="footer"] {
+      contain-intrinsic-size: 720px;
+    }
+  }
+
+  .section-title {
+    color: var(--color-foreground);
+    background: none;
+    opacity: 1;
+    visibility: visible;
+    -webkit-text-fill-color: currentColor;
+  }
+
+  .section-subtitle {
+    color: var(--color-muted-foreground);
+    background: none;
+    opacity: 1;
+    visibility: visible;
+    -webkit-text-fill-color: currentColor;
+  }
+
+  /* FAQ visibility + layout fallback (prevents utility-cascade regressions) */
+  .faq-item {
+    display: block;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+  }
+
+  .faq-trigger {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    border: 0;
+    background: transparent;
+    padding: 1.25rem 0;
+    text-align: left;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--color-foreground);
+    cursor: pointer;
+  }
+
+  .faq-trigger:hover {
+    text-decoration: underline;
+  }
+
+  .faq-icon {
+    color: var(--color-muted-foreground);
+    flex-shrink: 0;
+  }
+
+  .faq-content.hidden {
+    display: none;
+  }
+
+  .faq-content[data-state="open"] {
+    display: block;
+  }
+}
+
+/* Translator widget: stable component-level styles for interactive states */
+.translator-widget-card {
+  background-color: color-mix(in srgb, var(--color-card) 97%, var(--color-background) 3%);
+  border-color: color-mix(in srgb, var(--color-border) 72%, transparent);
+  box-shadow:
+    0 22px 46px -30px color-mix(in srgb, var(--color-foreground) 20%, transparent),
+    0 10px 24px -18px color-mix(in srgb, var(--color-foreground) 12%, transparent);
+}
+
+.translator-widget-top-gradient {
+  opacity: 0.9;
+}
+
+.translator-language-bar {
+  background-color: color-mix(in srgb, #fff 90%, var(--color-secondary) 10%);
+  display: grid;
+  grid-template-columns: auto auto auto;
+  justify-content: center;
+  align-items: center;
+  column-gap: clamp(0.85rem, 2.8vw, 2.2rem);
+}
+
+.translator-language-wrap {
+  position: relative;
+  width: clamp(11rem, 23vw, 15.5rem);
+}
+
+.translator-language-wrap-left {
+  z-index: 62;
+}
+
+.translator-language-wrap-right {
+  z-index: 61;
+}
+
+.translator-language-btn {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  justify-content: space-between;
+  border: 1px solid color-mix(in srgb, var(--color-border) 76%, transparent);
+  background-color: color-mix(in srgb, var(--color-secondary) 34%, #fff);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 58%, transparent),
+    0 10px 16px -18px color-mix(in srgb, var(--color-foreground) 40%, transparent);
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.translator-language-btn > div {
+  min-width: 0;
+}
+
+.translator-language-btn:hover {
+  background-color: color-mix(in srgb, var(--color-secondary) 78%, #fff);
+  border-color: color-mix(in srgb, var(--color-border) 92%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 70%, transparent),
+    0 12px 20px -18px color-mix(in srgb, var(--color-foreground) 48%, transparent);
+  transform: translateY(-1px);
+}
+
+.translator-language-btn:active {
+  transform: translateY(0);
+  background-color: color-mix(in srgb, var(--color-secondary) 66%, #fff);
+}
+
+.translator-language-btn:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--color-accent) 42%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 64%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.translator-language-btn.is-open {
+  background-color: color-mix(in srgb, var(--color-secondary) 84%, #fff);
+  border-color: color-mix(in srgb, var(--color-accent) 34%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 70%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--color-accent) 13%, transparent);
+}
+
+.translator-language-chevron {
+  flex-shrink: 0;
+  margin-inline-start: 0.3rem;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.translator-bidir-indicator {
+  color: color-mix(in srgb, var(--color-foreground) 82%, #111827);
+  opacity: 0.92;
+}
+
+.translator-language-btn.is-open .translator-language-chevron {
+  transform: rotate(180deg);
+}
+
+.translator-language-btn.is-active {
+  background-color: color-mix(in srgb, var(--color-accent) 10%, #fff);
+  border-color: color-mix(in srgb, var(--color-accent) 34%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 22%, transparent);
+}
+
+.translator-language-btn.is-active #lang-name-left,
+.translator-language-btn.is-active #lang-name-right {
+  color: color-mix(in srgb, var(--color-accent) 76%, #111827);
+}
+
+.translator-language-popover {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 60;
+  width: 15rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 85%, transparent);
+  border-radius: 0.9rem;
+  background-color: var(--color-card);
+  overflow: hidden;
+  box-shadow:
+    0 24px 40px -28px color-mix(in srgb, var(--color-foreground) 28%, transparent),
+    0 14px 24px -20px color-mix(in srgb, var(--color-foreground) 16%, transparent);
+}
+
+.translator-language-wrap-right .translator-language-popover {
+  left: auto;
+  right: 0;
+}
+
+.translator-language-search-wrap {
+  position: relative;
+  padding: 0.7rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+.translator-language-search-icon {
+  position: absolute;
+  left: 1.35rem;
+  top: 50%;
+  width: 0.95rem;
+  height: 0.95rem;
+  transform: translateY(-50%);
+  color: var(--color-muted-foreground);
+}
+
+.translator-language-search-input {
+  width: 100%;
+  height: 2.25rem;
+  border-radius: 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  background-color: color-mix(in srgb, var(--color-secondary) 48%, #fff);
+  color: var(--color-foreground);
+  font-size: 0.875rem;
+  padding: 0 0.7rem 0 2.15rem;
+}
+
+.translator-language-search-input::placeholder {
+  color: color-mix(in srgb, var(--color-muted-foreground) 85%, transparent);
+}
+
+.translator-language-search-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 15%, transparent);
+}
+
+.translator-language-list {
+  max-height: 17.5rem;
+  overflow-y: auto;
+  padding: 0.25rem 0;
+}
+
+.translator-language-option {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  cursor: pointer;
+  padding: 0.62rem 0.72rem;
+  color: var(--color-foreground);
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+
+.translator-language-option:hover {
+  background-color: color-mix(in srgb, var(--color-secondary) 74%, #fff);
+}
+
+.translator-language-option.is-selected {
+  background-color: color-mix(in srgb, var(--color-secondary) 88%, #fff);
+}
+
+.translator-language-option-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.translator-language-option-name {
+  font-size: 0.875rem;
+  line-height: 1.2;
+}
+
+.translator-language-option-native {
+  color: var(--color-muted-foreground);
+  font-size: 0.75rem;
+  margin-left: 0.6rem;
+  white-space: nowrap;
+}
+
+.translator-language-check {
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.translator-language-option-spacer {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.translator-language-empty {
+  padding: 1.2rem 0.8rem;
+  text-align: center;
+  color: var(--color-muted-foreground);
+  font-size: 0.85rem;
+}
+
+/* "Recent" / "All languages" above each part of the list. */
+.translator-language-section-label {
+  padding: 0.55rem 0.72rem 0.2rem;
+  color: var(--color-muted-foreground);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+
+.translator-language-section-label:not(:first-child) {
+  margin-top: 0.25rem;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+/* A side nobody has picked yet: "Choose language". */
+.translator-language-btn.is-unset {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+}
+
+.translator-language-btn.is-unset #lang-name-left,
+.translator-language-btn.is-unset #lang-name-right {
+  color: color-mix(in srgb, var(--color-accent) 80%, #111827);
+}
+
+.translator-swap-btn {
+  border: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 30%, transparent);
+}
+
+/* The mode switch only shows when there are two modes to pick from.
+   With Push to Talk alone, its selected half looked like a button. */
+html:not(.vt-auto-mode-allowed) div:has(> #voice-mode-manual-btn) {
+  display: none;
+}
+
+.translator-mic-area {
+  background: linear-gradient(180deg,
+      color-mix(in srgb, var(--color-secondary) 34%, #fff) 0%,
+      color-mix(in srgb, var(--color-secondary) 16%, #fff) 62%,
+      color-mix(in srgb, var(--color-card) 100%, transparent) 100%);
+}
+
+.translator-mic-shell {
+  isolation: isolate;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+
+/* Recording: one soft ring spreads out from behind the button, which stays
+   still. The button is tapped again to stop, so it must not move, and it is
+   in full view the whole time someone speaks. (#mic-ripple-2 and
+   #mic-middle-ring are still in the markup but no longer shown.) */
+.translator-mic-ripple {
+  pointer-events: none;
+  opacity: 0;
+  background: var(--color-accent);
+  will-change: transform, opacity;
+}
+
+.translator-mic-ripple.is-visible {
+  animation: translator-mic-ripple 1.5s ease-out infinite;
+}
+
+.translator-mic-middle-ring {
+  pointer-events: none;
+}
+
+.translator-mic-btn {
+  background-color: var(--color-foreground);
+  color: var(--color-background);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  transform-origin: center;
+  transition:
+    background-color 0.22s ease,
+    box-shadow 0.28s ease,
+    transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform, box-shadow;
+  box-shadow:
+    0 16px 28px -16px color-mix(in srgb, var(--color-foreground) 45%, transparent),
+    0 8px 16px -14px color-mix(in srgb, var(--color-foreground) 30%, transparent);
+}
+
+.translator-mic-btn.is-recording {
+  background-color: var(--color-accent);
+  color: #fff;
+  box-shadow:
+    0 24px 36px -18px color-mix(in srgb, var(--color-accent) 72%, transparent),
+    0 10px 24px -18px color-mix(in srgb, var(--color-accent) 52%, transparent),
+    0 0 0 4px color-mix(in srgb, #fff 72%, var(--color-accent) 28%);
+}
+
+.translator-mic-btn.is-processing {
+  opacity: 0.78;
+  cursor: wait;
+  pointer-events: none;
+}
+
+/* Push to Talk, recording: the microphone becomes a stop square, which
+   says "tap again to stop" without words. (Auto Detect keeps its
+   microphone.) */
+.translator-mic-btn.is-recording:not(.is-auto-on) .translator-mic-icon {
+  display: none;
+}
+
+.translator-mic-btn.is-recording:not(.is-auto-on)::after {
+  content: "";
+  width: 1.625rem;
+  height: 1.625rem;
+  border-radius: 0.4rem;
+  background: currentColor;
+  pointer-events: none;
+}
+
+.translator-mic-icon,
+.translator-mic-icon * {
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+
+.translator-mic-icon.is-recording {
+  color: #fff;
+}
+
+.translator-recording-active:not(.hidden) {
+  animation: translator-fade-in 0.2s ease;
+}
+
+.translator-recording-indicator {
+  min-height: 4rem;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.translator-recording-idle {
+  opacity: 1;
+}
+
+.translator-mic-shell *,
+.translator-mic-btn *,
+.translator-recording-indicator * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+
+.translator-voice-waves {
+  min-height: 1.25rem;
+}
+
+.translator-wave-bar {
+  width: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-accent) 80%, transparent);
+  animation: translator-wave 0.32s ease-in-out infinite alternate;
+  transform-origin: center bottom;
+}
+
+.translator-conversation-panel {
+  background-color: color-mix(in srgb, var(--color-card) 97%, var(--color-secondary) 3%);
+}
+
+.translator-conversation-head {
+  background-color: color-mix(in srgb, var(--color-secondary) 28%, #fff);
+}
+
+.translator-clear-btn:hover {
+  background-color: color-mix(in srgb, var(--color-secondary) 75%, #fff);
+}
+
+.translator-messages-container {
+  background-color: color-mix(in srgb, var(--color-secondary) 16%, #fff);
+}
+
+.translator-messages-list,
+.translator-message {
+  width: 100%;
+}
+
+.translator-messages-empty {
+  color: inherit;
+}
+
+.translator-empty-icon-wrap {
+  background-color: color-mix(in srgb, var(--color-secondary) 62%, #fff);
+}
+
+.translator-status-row {
+  min-height: 0.95rem;
+}
+
+.translator-message-bubble {
+  border: 1px solid transparent;
+}
+
+.translator-message-bubble.is-left {
+  background-color: color-mix(in srgb, var(--color-secondary) 88%, #fff);
+  border-color: color-mix(in srgb, var(--color-border) 56%, transparent);
+}
+
+.translator-message-bubble.is-right {
+  background-color: var(--color-foreground);
+  border-color: color-mix(in srgb, var(--color-foreground) 68%, transparent);
+}
+
+.translator-message-bubble.is-playing {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 44%, transparent);
+}
+
+.translator-play-btn.is-playing {
+  background-color: color-mix(in srgb, var(--color-accent) 14%, transparent);
+}
+
+.translator-play-btn.is-playing.is-left {
+  color: var(--color-accent);
+}
+
+.translator-play-btn.is-playing.is-right {
+  background-color: rgb(255 255 255 / 0.18);
+  color: #fff;
+}
+
+/* Sound bars inside the play button while a translation plays; same
+   footprint as the play icon so the button keeps its size. */
+.translator-btn-waves {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.translator-btn-waves i {
+  display: block;
+  width: 2px;
+  border-radius: 9999px;
+  background-color: currentColor;
+  animation: translator-wave 0.4s ease-in-out infinite alternate;
+  transform-origin: center;
+}
+
+.translator-btn-waves i:nth-child(1) { height: 6px; }
+.translator-btn-waves i:nth-child(2) { height: 12px; animation-delay: 100ms; }
+.translator-btn-waves i:nth-child(3) { height: 8px; animation-delay: 200ms; }
+.translator-btn-waves i:nth-child(4) { height: 11px; animation-delay: 300ms; }
+
+.translator-translation-border {
+  transition: border-color 0.2s ease;
+}
+
+@keyframes translator-mic-ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.3;
+  }
+
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+@keyframes translator-wave {
+  from {
+    transform: scaleY(0.45);
+  }
+
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes translator-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .translator-language-bar {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    padding: 1rem;
+    column-gap: 0.55rem;
+  }
+
+  .translator-language-wrap {
+    width: 100%;
+  }
+
+  .translator-language-btn {
+    padding-left: 0.8rem;
+    padding-right: 0.8rem;
+  }
+
+  .translator-language-popover {
+    width: min(15rem, 86vw);
+  }
+
+  .translator-mic-area {
+    padding: 1.5rem;
+  }
+}
+
+.studio-links {
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.9fr) minmax(0, 2.4fr);
+  gap: 0;
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 65%, transparent);
+}
+
+.studio-links-intro {
+  padding-right: 1.5rem;
+}
+
+.studio-links-kicker {
+  color: #59616d;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+}
+
+.studio-links-copy {
+  margin-top: 0.7rem;
+  max-width: 16rem;
+  color: #6f7680;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.studio-links-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.studio-link-card {
+  display: block;
+  min-width: 0;
+  padding: 0.35rem 1.5rem 0.45rem;
+  color: inherit;
+  text-decoration: none;
+  border-left: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+.studio-link-title,
+.studio-link-description {
+  display: block;
+}
+
+.studio-link-title {
+  color: #202936;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.studio-link-description {
+  margin-top: 0.45rem;
+  color: #6a7280;
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.studio-link-card:hover .studio-link-title {
+  color: var(--color-accent);
+}
+
+@media (max-width: 900px) {
+  .studio-links {
+    grid-template-columns: 1fr;
+    row-gap: 1.5rem;
+  }
+
+  .studio-links-intro {
+    padding-right: 0;
+  }
+
+  .studio-links-list {
+    border-top: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+  }
+
+  .studio-link-card {
+    padding: 1rem 0;
+    border-left: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+  }
+
+  .studio-link-card:last-child {
+    border-bottom: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .studio-links-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+.friend-links-marquee {
+  --friend-links-gap: 1rem;
+  --friend-links-duration: 24s;
+  --friend-links-shift: 0px;
+  --friend-link-badge-height: 2.1rem;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+}
+
+.friend-links-marquee:not(.is-marquee) {
+  justify-content: center;
+}
+
+.friend-links-marquee.is-marquee {
+  justify-content: flex-start;
+}
+
+.friend-links-heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-bottom: 0.9rem;
+  color: #8d939b;
+}
+
+.friend-links-heading svg {
+  width: 1.02rem;
+  height: 1.02rem;
+  color: #9aa0a8;
+  flex-shrink: 0;
+}
+
+.friend-links-heading span {
+  font-size: 1.02rem;
+  letter-spacing: 0.085em;
+  font-weight: 700;
+}
+
+.friend-links-text-row,
+.friend-links-image-row {
+  display: block;
+}
+
+.friend-links-text-row {
+  margin-bottom: 0.75rem;
+}
+
+.friend-text-links-track {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  margin-bottom: 0.85rem;
+}
+
+.friend-text-links-track::-webkit-scrollbar {
+  display: none;
+}
+
+.friend-text-link {
+  display: inline-block;
+  flex-shrink: 0;
+  color: #8f959d;
+  text-decoration: none;
+  font-size: 0.82rem;
+  line-height: 1.2;
+  transition: color 0.2s ease;
+}
+
+.friend-text-link:hover {
+  color: #5f6670;
+}
+
+.friend-links-image-row .friend-links-marquee {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.friend-links-marquee.is-marquee {
+  mask-image: linear-gradient(to right, transparent 0%, black 4%, black 96%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 4%, black 96%, transparent 100%);
+}
+
+.friend-links-reel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--friend-links-gap);
+  width: max-content;
+  white-space: nowrap;
+}
+
+.friend-links-track {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--friend-links-gap);
+  width: max-content;
+  white-space: nowrap;
+}
+
+.friend-link-badge-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--friend-link-badge-height);
+  line-height: 0;
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: opacity 0.2s ease;
+}
+
+.friend-link-badge-link:hover {
+  opacity: 0.9;
+}
+
+.friend-link-badge-link>img {
+  height: var(--friend-link-badge-height);
+  width: auto;
+  max-width: none;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.friend-link-badge,
+.friend-link-feature-badge,
+.friend-link-feature-badge-md {
+  display: block;
+  height: var(--friend-link-badge-height);
+  width: auto;
+  border-radius: 0.35rem;
+  flex-shrink: 0;
+}
+
+.friend-links-marquee.is-marquee .friend-links-reel {
+  animation: friend-links-scroll var(--friend-links-duration) linear infinite;
+  will-change: transform;
+}
+
+.friend-links-marquee.is-marquee:hover .friend-links-reel {
+  animation-play-state: paused;
+}
+
+@keyframes friend-links-scroll {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(calc(-1 * var(--friend-links-shift)));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .friend-links-marquee.is-marquee .friend-links-reel {
+    animation: none;
+  }
+}
+
+.auth-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(10, 17, 30, 0.45);
+}
+
+.auth-modal-backdrop.hidden {
+  display: none;
+}
+
+.auth-modal {
+  width: min(420px, 100%);
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 90%, transparent);
+  background: var(--color-card);
+  box-shadow: 0 20px 50px -25px rgba(0, 0, 0, 0.45);
+  padding: 1rem;
+}
+
+.auth-modal-title {
+  margin-top: 2.25rem;
+}
+
+.auth-modal.auth-modal-with-flow-nav .auth-modal-title {
+  margin-top: 4.25rem;
+}
+
+.auth-modal h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-foreground);
+}
+
+.auth-modal-subtitle {
+  margin-top: 0.2rem;
+  color: var(--color-muted-foreground);
+  font-size: 0.82rem;
+}
+
+#auth-form {
+  margin-top: 0.8rem;
+  display: grid;
+  gap: 0.42rem;
+}
+
+#auth-confirm-group {
+  display: grid;
+  gap: 0.42rem;
+}
+
+#auth-form label {
+  font-size: 0.78rem;
+  color: var(--color-muted-foreground);
+}
+
+#auth-form input {
+  height: 2.3rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.6rem;
+  padding: 0 0.7rem;
+  font-size: 0.9rem;
+  color: var(--color-foreground);
+  background: #fff;
+}
+
+#auth-form input:focus {
+  border-color: color-mix(in srgb, var(--color-accent) 70%, transparent);
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.auth-captcha-group {
+  margin-top: 0.2rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+#auth-captcha-widget {
+  min-height: 66px;
+}
+
+.auth-captcha-hint {
+  min-height: 1rem;
+  font-size: 0.74rem;
+  color: var(--color-muted-foreground);
+}
+
+.auth-captcha-hint.error {
+  color: #b42318;
+}
+
+.auth-legal-note {
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--color-muted-foreground);
+}
+
+.auth-legal-link {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.auth-legal-link:hover {
+  text-decoration: underline;
+}
+
+.auth-form-message {
+  margin-top: 0.55rem;
+  font-size: 0.78rem;
+  min-height: 1.1rem;
+  color: var(--color-muted-foreground);
+}

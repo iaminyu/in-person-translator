@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>In-person translator</title>
+  <meta name="description" content="Two people, one phone, two languages. Tap, speak, and the other person hears it." />
+  <meta name="robots" content="noindex" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="/translator.css" />
+</head>
+
+<body tabindex="-1" data-site-shell="voice" data-source-language-code="zh" data-target-language-code="th"
+  class="page-home bg-background text-foreground antialiased selection:bg-accent/20 selection:text-foreground">
+  <main class="relative min-h-screen">
+    <section id="translator" class="py-12 px-6 relative z-10">
+      <div class="mx-auto max-w-4xl">
+        <div
+          class="translator-widget-card relative rounded-3xl bg-card border border-border/60 shadow-2xl shadow-foreground/5 overflow-hidden">
+          <div
+            class="translator-widget-top-gradient absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-accent/50 to-transparent">
+          </div>
+    
+          <div class="translator-language-bar p-6 border-b border-border/40">
+            <div class="translator-language-wrap translator-language-wrap-left">
+              <button id="lang-btn-left" type="button" aria-haspopup="dialog" aria-expanded="false"
+                class="translator-language-btn flex items-center gap-3 px-4 py-3 rounded-2xl group flex-row">
+                <div class="flex flex-col text-left">
+                  <span id="lang-name-left"
+                    class="text-base font-medium transition-colors text-foreground">Chinese</span>
+                  <span id="lang-native-left" class="text-xs text-muted-foreground">中文</span>
+                </div>
+                <svg id="lang-chevron-left" xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="translator-language-chevron h-4 w-4 text-muted-foreground group-hover:text-foreground transition-all duration-200">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              <div id="lang-popover-left" class="translator-language-popover hidden" role="dialog"
+                aria-label="Select source language">
+                <div class="translator-language-search-wrap">
+                  <svg class="translator-language-search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="m21 21-4.3-4.3"></path>
+                  </svg>
+                  <input id="lang-search-left" type="text" placeholder="Search language..." autocomplete="off"
+                    class="translator-language-search-input" />
+                </div>
+                <div id="lang-list-left" class="translator-language-list" role="listbox" aria-label="Source languages">
+                </div>
+              </div>
+            </div>
+    
+            <div class="translator-bidir-indicator relative flex items-center justify-center w-10 h-10" role="img"
+              aria-label="Bidirectional translation">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="h-5 w-5 text-muted-foreground/80">
+                <path d="m8 3 4 4-4 4" />
+                <path d="M4 7h8" />
+                <path d="m16 21-4-4 4-4" />
+                <path d="M20 17h-8" />
+              </svg>
+            </div>
+    
+            <div class="translator-language-wrap translator-language-wrap-right">
+              <button id="lang-btn-right" type="button" aria-haspopup="dialog" aria-expanded="false"
+                class="translator-language-btn flex items-center gap-3 px-4 py-3 rounded-2xl group flex-row-reverse">
+                <div class="flex flex-col text-right">
+                  <span id="lang-name-right"
+                    class="text-base font-medium transition-colors text-foreground">Thai</span>
+                  <span id="lang-native-right" class="text-xs text-muted-foreground">ไทย</span>
+                </div>
+                <svg id="lang-chevron-right" xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="translator-language-chevron h-4 w-4 text-muted-foreground group-hover:text-foreground transition-all duration-200">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              <div id="lang-popover-right" class="translator-language-popover hidden" role="dialog"
+                aria-label="Select target language">
+                <div class="translator-language-search-wrap">
+                  <svg class="translator-language-search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="m21 21-4.3-4.3"></path>
+                  </svg>
+                  <input id="lang-search-right" type="text" placeholder="Search language..." autocomplete="off"
+                    class="translator-language-search-input" />
+                </div>
+                <div id="lang-list-right" class="translator-language-list" role="listbox" aria-label="Target languages">
+                </div>
+              </div>
+            </div>
+          </div>
+    
+          <div class="translator-stage-surface bg-[#f6f8fa]">
+          <div class="translator-mic-area p-8">
+            <div class="flex flex-col items-center">
+              <div class="mb-6 flex w-full max-w-xl flex-col items-center gap-4">
+                <div class="inline-flex rounded-full border border-border/70 bg-background/80 p-1 shadow-sm backdrop-blur">
+                  <button id="voice-mode-manual-btn" type="button" aria-pressed="true"
+                    class="rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background shadow-sm transition-colors duration-200">
+                    Push to Talk
+                  </button>
+                  <button id="voice-mode-auto-btn" type="button" aria-pressed="false"
+                    class="hidden rounded-full px-4 py-2 text-sm font-medium text-muted-foreground transition-colors duration-200">
+                    Auto Detect
+                  </button>
+                </div>
+                <div class="flex flex-col items-center gap-2 text-center">
+                  <p id="voice-mode-description" hidden class="max-w-xl text-sm leading-relaxed text-muted-foreground"></p>
+                  <span id="auto-session-badge" hidden
+                    class="inline-flex items-center rounded-full border border-border/70 bg-card/80 px-3 py-1 text-xs font-medium text-muted-foreground transition-colors duration-200"></span>
+                </div>
+              </div>
+    
+              <div class="translator-mic-shell relative">
+                <div id="mic-ripple-1"
+                  class="translator-mic-ripple absolute inset-0 rounded-full bg-accent/10 animate-ping hidden"
+                  style="animation-duration: 1.5s;"></div>
+                <div id="mic-ripple-2"
+                  class="translator-mic-ripple absolute inset-0 rounded-full bg-accent/5 animate-ping hidden"
+                  style="animation-duration: 2s; animation-delay: 0.5s;"></div>
+                <div id="mic-middle-ring"
+                  class="translator-mic-middle-ring absolute inset-0 rounded-full border-2 transition-all duration-300 border-transparent scale-100 opacity-0">
+                </div>
+    
+                <button id="mic-btn" type="button"
+                  class="translator-mic-btn relative flex items-center justify-center w-20 h-20 rounded-full transition-all duration-300 shadow-lg select-none bg-foreground hover:bg-foreground/90 hover:scale-105">
+                  <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    class="translator-mic-icon h-8 w-8 transition-colors duration-300 text-background">
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" x2="12" y1="19" y2="22" />
+                  </svg>
+                </button>
+              </div>
+    
+              <div class="translator-recording-indicator mt-6 h-16 flex flex-col items-center justify-start w-full">
+                <div id="recording-idle" class="translator-recording-idle text-center transition-opacity duration-200">
+                  <p class="text-sm text-muted-foreground">Tap to talk</p>
+                </div>
+    
+                <div id="recording-active"
+                  class="translator-recording-active flex flex-col items-center animate-in fade-in duration-200 hidden">
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="relative flex h-2.5 w-2.5">
+                      <span
+                        class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                    </span>
+                    <span id="recording-state-label" class="text-accent font-medium">Recording</span>
+                    <span id="recording-duration" class="text-muted-foreground text-sm font-mono">0.0s</span>
+                  </div>
+                  <p class="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-accent/60 animate-pulse"></span>
+                    Tap again when you finish speaking
+                  </p>
+                  <div class="translator-voice-waves mt-2 flex items-center gap-1" id="voice-waves"></div>
+                </div>
+    
+              </div>
+    
+              <div id="mic-permission-notice" role="status" aria-live="polite"
+                class="hidden mt-4 w-full max-w-2xl px-4 text-center">
+                <div class="rounded-2xl px-5 py-4"
+                  style="border: 1px solid rgba(15, 23, 42, 0.12); background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(241, 245, 249, 0.96) 100%); box-shadow: 0 14px 32px -24px rgba(15, 23, 42, 0.35);">
+                  <h3 id="mic-permission-title" class="text-base font-semibold leading-relaxed"
+                    style="color: #0f172a;">
+                    Microphone access is blocked
+                  </h3>
+                  <p id="mic-permission-body" class="mt-2 text-sm leading-relaxed"
+                    style="color: #475569;">
+                    Check your browser permissions and microphone settings, then try again.
+                  </p>
+                  <div class="mt-3 flex flex-wrap items-center justify-center gap-3">
+                    <button id="mic-permission-refresh-btn" type="button" class="ui-btn ui-btn-secondary">
+                      Refresh page
+                    </button>
+                    <button id="mic-permission-help-btn" type="button" class="ui-btn ui-btn-ghost"
+                      style="text-decoration: underline; text-underline-offset: 3px;">
+                      How to enable microphone
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+    
+          <div class="translator-conversation-panel">
+            <div class="translator-conversation-head flex items-center justify-center gap-4 px-6 py-3">
+              <div aria-hidden="true" class="flex-1 border-t border-dashed border-border/60"></div>
+              <span class="text-xs font-medium text-muted-foreground">Conversation</span>
+              <div aria-hidden="true" class="flex-1 border-t border-dashed border-border/60"></div>
+            </div>
+    
+            <div id="messages-container"
+              class="translator-messages-container min-h-[280px] max-h-[400px] overflow-y-auto p-6 scroll-smooth">
+              <div id="messages-empty"
+                class="translator-messages-empty flex flex-col items-center justify-center h-[240px] text-center">
+                <div
+                  class="translator-empty-icon-wrap w-16 h-16 rounded-2xl bg-secondary/50 flex items-center justify-center mb-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    class="h-7 w-7 text-muted-foreground/60">
+                    <path d="M19 4H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Z" />
+                    <path d="M8 9h8" />
+                    <path d="M8 13h5" />
+                  </svg>
+                </div>
+                <p class="text-muted-foreground text-sm">Start speaking to see the translation</p>
+                <p class="text-muted-foreground/60 text-xs mt-1">Your conversation will appear here</p>
+              </div>
+    
+              <div id="messages-list" class="translator-messages-list space-y-6 hidden"></div>
+            </div>
+          </div>
+          </div>
+        </div>
+      </div>
+    
+      <div class="auth-modal-backdrop hidden" id="mic-help-modal-backdrop" aria-hidden="true">
+        <div class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="mic-help-modal-title"
+          aria-describedby="mic-help-modal-description" style="width: min(460px, 100%);">
+          <h2 id="mic-help-modal-title" class="text-[22px] font-semibold text-center mt-3 text-gray-900">
+            How to enable microphone
+          </h2>
+          <p class="auth-modal-subtitle text-center text-[15px] text-gray-500 mt-2 mb-6" id="mic-help-modal-description">
+            If the microphone prompt does not appear, check browser permissions and device microphone settings.
+          </p>
+    
+          <div id="mic-help-modal-steps" style="display: grid; gap: 0.85rem; margin: 0 0.35rem;">
+            <div
+              style="display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.9rem 1rem; border-radius: 0.9rem; background: rgba(248, 250, 252, 0.95); border: 1px solid rgba(148, 163, 184, 0.18);">
+              <div
+                style="flex: 0 0 auto; width: 1.65rem; height: 1.65rem; border-radius: 9999px; background: rgba(15, 23, 42, 0.08); color: #0f172a; display: flex; align-items: center; justify-content: center; font-size: 0.84rem; font-weight: 700;">
+                1
+              </div>
+              <p style="margin: 0; color: #475569; font-size: 0.92rem; line-height: 1.55;">
+                Refresh this page, then try the microphone again.
+              </p>
+            </div>
+          </div>
+    
+          <div class="flex justify-center w-full mt-5">
+            <button class="ui-btn ui-btn-secondary w-[320px] h-[46px] rounded-[10px] text-[15px] font-medium"
+              type="button" id="close-mic-help-modal-btn">
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script defer src="/voice-translator/voice-page.js"></script>
+</body>
+
+</html>

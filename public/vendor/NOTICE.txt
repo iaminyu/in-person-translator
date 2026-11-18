@@ -1,0 +1,27 @@
+Third-party files in this folder
+
+onnxruntime-web-1.19.2/ort.wasm.min.js
+onnxruntime-web-1.19.2/ort-wasm-simd-threaded.mjs
+  ONNX Runtime Web 1.19.2. Copyright (c) Microsoft Corporation. MIT License.
+  Source: npm package onnxruntime-web@1.19.2, dist/ (https://github.com/microsoft/onnxruntime).
+  The matching engine, ort-wasm-simd-threaded.wasm, is fetched at run time from
+  cdn.jsdelivr.net or unpkg.com and only used if its SHA-256 is
+  1bf0b9ed7ad025cf9ca88ce6da29e54df3f128a169f8241d71823e81f078d578.
+
+silero-vad/silero_vad_v5.onnx
+  Silero VAD v5. Copyright (c) Silero Team. MIT License.
+  Source: npm package @ricky0123/vad-web@0.0.22, dist/ (https://github.com/snakers4/silero-vad).
+  SHA-256 2623a2953f6ff3d2c1e61740c6cdb7168133479b267dfef114a4a3cc5bdd788f.
+
+MIT License: permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal in the
+Software without restriction, including without limitation the rights to use, copy,
+modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
+to permit persons to whom the Software is furnished to do so, subject to the following
+conditions: the above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS",
+WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

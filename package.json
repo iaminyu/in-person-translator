@@ -1,0 +1,25 @@
+{
+  "name": "in-person-translator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Two people, one phone, two languages: push-to-talk voice translation on Gemini Live, with the evaluation behind every design choice.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build:css": "tailwindcss -i styles/translator.css -o public/translator.css --minify",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.2.1",
+    "tailwindcss": "^4.2.1"
+  }
+}
