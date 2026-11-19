@@ -431,9 +431,16 @@
       let tapStartActive = false;
       let tapStartToken = 0;
       // The press that started the current recording (or its start), while
-      // the finger is still down: { pointerId, startedAt }. Its length, once
-      // the finger lifts, tells a tap from a held press (see onMicPressEnd).
+      // the finger is still down: { pointerId, pressedAt }. How long it stays
+      // down once the recording runs tells a tap from a held press (see
+      // onMicPressEnd).
       let micPress = null;
+      // When the current recording started (performance.now()).
+      let recordingStartedAt = 0;
+      // When the press that is opening the microphone began, and how long
+      // it then took until the recording started (for the turn report).
+      let recordingPressAt = 0;
+      let recordingMicWaitMs = null;
       let keyboardHoldActive = false;
       let keyboardPressToken = 0;
       let idleInstructionMode = "default";
@@ -455,6 +462,25 @@
       // (the recording stops when the finger lifts). Measured taps on an
       // iPhone last about 0.1 s; a held press with anything said, over 1 s.
       const HOLD_TO_TALK_MS = 400;
+
+      // When the finger touched or left the button, by the event's own time.
+      // While the page is busy opening the microphone it may handle the
+      // event late, and a quick tap must not be taken for a held press.
+      const pointerEventTime = (event) => {
+        const now = performance.now();
+        const stamp = Number(event && event.timeStamp);
+        return Number.isFinite(stamp) && stamp > 0 && stamp <= now ? stamp : now;
+      };
+
+      // Whether a press held the recording: only the time the finger stayed
+      // down after the recording had started counts. A finger lifted while
+      // the microphone was still opening was a tap, and the recording starts
+      // as usual (it used to be given up, and the iPhone still ticked: the
+      // phone "buzzed but did not record", seen 2026-11-18).
+      const pressHeldRecording = ({ pressedAt, liftedAt, recordingStartedAt }) => {
+        if (!recordingStartedAt) return false;
+        return liftedAt - Math.max(pressedAt, recordingStartedAt) >= HOLD_TO_TALK_MS;
+      };
       // Push to Talk keeps the microphone open this long after a turn.
       const MANUAL_MIC_KEEP_MS = 120000;
       const MANUAL_MIC_RECHECK_MS = 5000;
@@ -887,6 +913,19 @@
           ms: "Ayat ini tidak dibacakan. Sila baca teksnya.",
           fil: "Hindi nabasa nang malakas ang pangungusap na ito. Basahin ang text."
         },
+        "Only part of this one was translated. Please say it again.": {
+          "zh-CN": "这一句只翻译了一部分，请再说一遍。",
+          "zh-TW": "這一句只翻譯了一部分，請再說一遍。",
+          en: "Only part of this one was translated. Please say it again.",
+          th: "ประโยคนี้แปลได้แค่บางส่วน โปรดพูดอีกครั้ง",
+          ja: "この文は一部しか翻訳されませんでした。もう一度話してください。",
+          ko: "이 문장은 일부만 번역되었습니다. 다시 말씀해 주세요.",
+          vi: "Câu này chỉ được dịch một phần. Vui lòng nói lại.",
+          es: "Solo se tradujo parte de esta frase. Dila otra vez.",
+          id: "Hanya sebagian kalimat ini yang diterjemahkan. Silakan ucapkan lagi.",
+          ms: "Hanya sebahagian ayat ini diterjemahkan. Sila sebut sekali lagi.",
+          fil: "Bahagi lang ng pangungusap na ito ang naisalin. Pakisabi ulit."
+        },
         "This one was not translated. Please say it again.": {
           "zh-CN": "这一句没有翻译成功，请再说一遍。",
           "zh-TW": "這一句沒有翻譯成功，請再說一遍。",
@@ -969,6 +1008,34 @@
           id: "Coba lagi",
           ms: "Cuba lagi",
           fil: "Subukan ulit"
+        },
+        // Under the record button while the microphone opens: not yet.
+        "One moment…": {
+          "zh-CN": "稍等…",
+          "zh-TW": "稍等…",
+          en: "One moment…",
+          th: "รอสักครู่…",
+          ja: "お待ちください…",
+          ko: "잠시만요…",
+          vi: "Chờ một chút…",
+          es: "Un momento…",
+          id: "Tunggu sebentar…",
+          ms: "Tunggu sebentar…",
+          fil: "Sandali lang…"
+        },
+        // Under the record button while it records: go ahead.
+        "Speak now": {
+          "zh-CN": "请说",
+          "zh-TW": "請說",
+          en: "Speak now",
+          th: "พูดได้เลย",
+          ja: "話してください",
+          ko: "말씀하세요",
+          vi: "Mời nói",
+          es: "Habla ahora",
+          id: "Silakan bicara",
+          ms: "Sila bercakap",
+          fil: "Magsalita na"
         }
       };
       const NOT_TRANSLATED_RETRY_NOTICE = "This one was not translated. Tap Retry to try again.";
@@ -1039,6 +1106,50 @@
       // use the button). On the full-screen phone view, which both people
       // look at, it is hidden: the button's own look says it instead.
       const wrapPageHintHtml = (html) => `<span class="vt-page-hint">${html}</span>`;
+
+      // Under the record button, in both languages of the conversation: wait
+      // while the microphone opens, speak once it records. Before, the button
+      // only turned grey with a blue ring, and someone new to it took any
+      // change for "recording" and started talking too soon (seen
+      // 2026-11-18). While it opens, the button itself turns pale with
+      // moving dots instead of the microphone (talk-mode.css); blue is kept
+      // for recording. The line is shown on the full-screen view only. It is
+      // not a button and takes no touch: something tappable appearing during
+      // a tap makes an iPhone drop that tap's click, and with it the tick.
+      const MIC_CUE_WAIT = "One moment…";
+      const MIC_CUE_SPEAK = "Speak now";
+      const micCue = (() => {
+        const shell = micBtn ? micBtn.closest(".translator-mic-shell") : null;
+        if (!shell) return null;
+        const dots = document.createElement("span");
+        dots.className = "vt-mic-dots";
+        dots.setAttribute("aria-hidden", "true");
+        dots.innerHTML = "<i></i><i></i><i></i>";
+        micBtn.appendChild(dots);
+        const cue = document.createElement("span");
+        cue.className = "vt-mic-cue";
+        cue.setAttribute("aria-live", "polite");
+        shell.appendChild(cue);
+        return cue;
+      })();
+      let micCueKind = "";
+      const updateMicCue = () => {
+        if (!micCue || !micBtn) return;
+        const kind = micBtn.classList.contains("is-recording")
+          ? "speak"
+          : micBtn.classList.contains("is-preparing")
+            ? "wait"
+            : "";
+        if (kind === micCueKind) return;
+        micCueKind = kind;
+        micCue.dataset.kind = kind;
+        micCue.innerHTML = kind
+          ? renderPairLabelHtml(kind === "speak" ? MIC_CUE_SPEAK : MIC_CUE_WAIT, [
+              leftLang?.name,
+              rightLang?.name
+            ])
+          : "";
+      };
 
       // The button shakes briefly: the press did not count.
       let micNudgeTimer = 0;
@@ -1497,11 +1608,30 @@
             micBtn.removeAttribute("aria-busy");
           }
         }
+        updateMicCue();
         if (preparing) {
           setIdleInstructionMode("preparing");
         } else if (idleInstructionMode === "preparing") {
           setIdleInstructionMode("default");
         }
+      };
+
+      // A press shows the button getting ready: at once when the microphone
+      // has to be opened, otherwise only if the start takes longer than a
+      // moment (the phone may have paused the page's audio, and waking it can
+      // take over a second). Before, that wait showed nothing, so a second
+      // tap looked needed, and it gave the start up. Returns a function that
+      // calls off the late showing once the start is through.
+      const MIC_PREPARING_DELAY_MS = 150;
+      const showMicPreparing = (stillStarting) => {
+        if (!mediaStream) {
+          setMicPreparing(true);
+          return () => {};
+        }
+        const timer = window.setTimeout(() => {
+          if (stillStarting() && !isRecording) setMicPreparing(true);
+        }, MIC_PREPARING_DELAY_MS);
+        return () => window.clearTimeout(timer);
       };
 
       const syncVoiceModeUi = () => {
@@ -1980,6 +2110,7 @@
         }
         if (micBtn) micBtn.classList.toggle("is-recording", recording);
         if (micIcon) micIcon.classList.toggle("is-recording", recording);
+        updateMicCue();
         // One soft ring spreads from the button while it records. The second
         // ripple and the middle ring in the markup are no longer shown.
         if (micRipple1) {
@@ -2869,8 +3000,98 @@
       // the pieces after it have time to arrive before it runs out.
       const PLAYBACK_RESTART_LEAD_SECONDS = 0.08;
 
+      // How the playing of one translation went, for the turn report
+      // (sendPlaybackReport). A translation was heard to stumble once on its
+      // first playing and not when played again (2026-11-18), and nothing
+      // was left to tell why: a piece that arrived after the one before it
+      // had run out, the phone's or computer's sound falling behind, or
+      // neither. One record per translation, begun when its queue is reset.
+      let playbackHealth = null;
+      const PLAYBACK_LATE_NOTES_MAX = 5;
+      // Chrome counts the moments the sound card was given nothing to
+      // play; other browsers do not say.
+      const readPlaybackUnderruns = () => {
+        try {
+          const stats = audioContext && audioContext.playbackStats;
+          if (!stats || typeof stats.underrunEvents !== "number") return null;
+          return { events: stats.underrunEvents, ms: (Number(stats.underrunDuration) || 0) * 1000 };
+        } catch {
+          return null;
+        }
+      };
+      // The record stays open while the sentence's turn is under way, also
+      // when the sound runs out in between: the piece that then comes late
+      // is the very thing to be noted. It is closed when the playing is
+      // stopped or replaced, or, once the turn has been reported
+      // (reportPlaybackFor), when the last sound has played.
+      // `cut`: stopped by the page before its end.
+      const finishPlaybackHealth = (cut) => {
+        const health = playbackHealth;
+        if (!health || health.done) return;
+        health.done = true;
+        if (!health.pieces) return;
+        health.cut = cut;
+        try {
+          // How far the audio clock fell behind the wall clock while this
+          // played: it stands still while the sound is interrupted.
+          health.clockLagMs = Math.round(
+            performance.now() - health.firstWall - (audioContext.currentTime - health.firstContextTime) * 1000
+          );
+          const underruns = readPlaybackUnderruns();
+          if (underruns && health.underrunsAtStart) {
+            health.underruns = underruns.events - health.underrunsAtStart.events;
+            health.underrunMs = Math.round(underruns.ms - health.underrunsAtStart.ms);
+          }
+        } catch {
+          // The report goes without them.
+        }
+        if (health.requestId) sendPlaybackReport(health);
+      };
+      // One piece as it is queued. `ahead`: how much sound was still queued
+      // when it arrived; `gap`: the silence before it, when it does not
+      // follow straight on.
+      const notePlaybackPiece = (followsOn, ahead, gap, seconds) => {
+        const health = playbackHealth;
+        if (!health || health.done) return;
+        if (!health.pieces) {
+          health.firstWall = performance.now();
+          health.firstContextTime = audioContext.currentTime;
+          health.underrunsAtStart = readPlaybackUnderruns();
+        } else {
+          const aheadMs = Math.max(0, Math.round(ahead * 1000));
+          health.aheadMs = health.aheadMs === null ? aheadMs : Math.min(health.aheadMs, aheadMs);
+          if (!followsOn) {
+            health.lateCount += 1;
+            if (health.late.length < PLAYBACK_LATE_NOTES_MAX) {
+              health.late.push({ atMs: Math.round(health.audioMs), gapMs: Math.max(0, Math.round(gap * 1000)) });
+            }
+          }
+        }
+        if (audioContext.state !== "running") health.notRunning += 1;
+        health.pieces += 1;
+        health.audioMs += seconds * 1000;
+      };
+
       const resetStreamingPlaybackQueue = () => {
         if (!audioContext) return;
+        // A first piece still waiting belongs to what came before.
+        dropHeldPlaybackPiece();
+        finishPlaybackHealth(streamingPlaybackSources.size > 0);
+        playbackHealth = {
+          pieces: 0,
+          audioMs: 0,
+          aheadMs: null,
+          lateCount: 0,
+          late: [],
+          notRunning: 0,
+          clockLagMs: null,
+          underruns: null,
+          underrunMs: null,
+          cut: false,
+          done: false,
+          requestId: "",
+          after: null
+        };
         const now = audioContext.currentTime;
         // A fade never ends more than a moment ahead; anything later is a
         // leftover and must not hold the next translation back.
@@ -2887,7 +3108,15 @@
 
       // How long the translation queued for playback still has to run.
       const streamingPlaybackRemainingMs = () => {
-        if (!audioContext || !streamingPlaybackSources.size) return 0;
+        if (!audioContext) return 0;
+        if (heldPlaybackPiece) {
+          // A first piece still waiting to start (see schedulePlaybackPiece).
+          return (
+            PLAYBACK_START_HOLD_MS +
+            (PLAYBACK_RESTART_LEAD_SECONDS + heldPlaybackPiece.floatData.length / heldPlaybackPiece.sampleRate) * 1000
+          );
+        }
+        if (!streamingPlaybackSources.size) return 0;
         return Math.max(0, (playbackCursorTime - audioContext.currentTime) * 1000);
       };
 
@@ -2917,6 +3146,7 @@
             stopAt = 0;
           }
         }
+        if (streamingPlaybackSources.size) finishPlaybackHealth(true);
         for (const source of streamingPlaybackSources) {
           source.onended = null;
           try {
@@ -3333,8 +3563,42 @@
         schedulePlaybackPiece(floatData, sampleRate);
       };
 
-      // Queues one decoded piece to play after the ones before it.
+      // The first piece of a translation waits here for the second one (or
+      // this long, whichever comes first) and the two are queued together.
+      // Played at once, a first piece as short as 0.08 s ran out before a
+      // second piece only 0.2 s behind it: the first sound, a silence, then
+      // the rest. The second piece is normally 0.02 to 0.06 s behind
+      // (measured 2026-11-18), so the translation starts that much later
+      // and with some 0.4 s more sound in hand.
+      const PLAYBACK_START_HOLD_MS = 120;
+      let heldPlaybackPiece = null;
+      const dropHeldPlaybackPiece = () => {
+        if (!heldPlaybackPiece) return;
+        window.clearTimeout(heldPlaybackPiece.timer);
+        heldPlaybackPiece = null;
+      };
+      const releaseHeldPlaybackPiece = () => {
+        const held = heldPlaybackPiece;
+        if (!held) return;
+        dropHeldPlaybackPiece();
+        queuePlaybackPiece(held.floatData, held.sampleRate);
+      };
       const schedulePlaybackPiece = (floatData, sampleRate) => {
+        if (heldPlaybackPiece) {
+          releaseHeldPlaybackPiece();
+        } else if (!lastPlaybackPiece) {
+          heldPlaybackPiece = {
+            floatData,
+            sampleRate,
+            timer: window.setTimeout(releaseHeldPlaybackPiece, PLAYBACK_START_HOLD_MS)
+          };
+          return;
+        }
+        queuePlaybackPiece(floatData, sampleRate);
+      };
+
+      // Queues one decoded piece to play after the ones before it.
+      const queuePlaybackPiece = (floatData, sampleRate) => {
         if (!audioContext || !playbackGainNode) return;
         // Does this piece follow straight on from the one before? Only if
         // that one has not begun to fade out yet: its fade is called off
@@ -3392,6 +3656,7 @@
           : Math.ceil(Math.max(now + PLAYBACK_RESTART_LEAD_SECONDS, playbackCursorTime) * outputRate);
         // A hair after the sample, so rounding either way lands on it.
         const startAt = (startFrame + 0.000001) / outputRate;
+        notePlaybackPiece(followsOn, playbackCursorTime - now, startAt - playbackCursorTime, outputCount / outputRate);
         playbackCursorFrame = startFrame + outputCount;
         const endAt = playbackCursorFrame / outputRate;
         const fadeStart = endAt - Math.min(PLAYBACK_FADE_SECONDS, outputCount / outputRate / 2);
@@ -3410,7 +3675,10 @@
           } catch {
             // ignored
           }
-          if (!streamingPlaybackSources.size) resumeMicrophoneAfterPlayback();
+          if (!streamingPlaybackSources.size) {
+            if (playbackHealth && playbackHealth.requestId) finishPlaybackHealth(false);
+            resumeMicrophoneAfterPlayback();
+          }
         };
       };
 
@@ -3431,26 +3699,55 @@
         };
       }
 
-      const streamTranslateTurn = async ({ audioBase64, languageA, languageB, voice, accessToken, retry, onEvent }) => {
+      const streamTranslateTurn = async ({
+        audioBase64,
+        languageA,
+        languageB,
+        voice,
+        accessToken,
+        retry,
+        engine,
+        onEvent
+      }) => {
         const headers = { "Content-Type": "application/json" };
         if (accessToken) {
           headers.Authorization = `Bearer ${accessToken}`;
         }
 
-        const response = await fetch("/api/translate-turn-stream", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            audioBase64,
-            languageA,
-            languageB,
-            voice,
-            lowLatencyAudio: false,
-            // Why this recording is being translated a second time (numbers
-            // only, for the server's log). Absent on a first attempt.
-            ...(retry ? { retry } : {})
-          })
-        });
+        // Each way this can fail carries a `reason` for the turn report
+        // (describeAttemptFailure): "network" (the request never got an
+        // answer), "http-<status>", "server-error" (the server said it
+        // failed), "stream-broken" (the answer stopped arriving midway; on
+        // 2026-11-18 one did 4.8 s in, while the server went on to finish
+        // the translation nobody heard).
+        const withReason = (error, reason) => {
+          if (error && typeof error === "object" && !error.reason && !isConversationResetError(error)) {
+            error.reason = reason;
+          }
+          return error;
+        };
+        let response;
+        try {
+          response = await fetch("/api/translate-turn-stream", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              audioBase64,
+              languageA,
+              languageB,
+              voice,
+              lowLatencyAudio: false,
+              // Why this recording is being translated a second time (numbers
+              // only, for the server's log). Absent on a first attempt.
+              ...(retry ? { retry } : {}),
+              // "openai": Gemini already got this recording wrong twice (see
+              // geminiFailedTwice), so the server goes straight to OpenAI.
+              ...(engine ? { engine } : {})
+            })
+          });
+        } catch (error) {
+          throw withReason(error, "network");
+        }
 
         if (!response.ok) {
           let message = `HTTP ${response.status}`;
@@ -3475,6 +3772,8 @@
           }
           if (limitDetails) {
             requestError.limit = limitDetails;
+          } else {
+            requestError.reason = `http-${response.status}`;
           }
           throw requestError;
         }
@@ -3488,7 +3787,13 @@
         let buffer = "";
         try {
           while (true) {
-            const { done, value } = await reader.read();
+            let chunk;
+            try {
+              chunk = await reader.read();
+            } catch (error) {
+              throw withReason(error, "stream-broken");
+            }
+            const { done, value } = chunk;
             if (done) break;
             buffer += decoder.decode(value, { stream: true });
             let newlineIndex = buffer.indexOf("\n");
@@ -3737,6 +4042,7 @@
               stopReplayAudio();
               return;
             }
+            noteCardSignal(cardApi, "replayed");
             if (currentReplayAudio && currentReplayAudio !== cardAudio) {
               currentReplayAudio.pause();
             }
@@ -4002,6 +4308,10 @@
           closeCorrectEditor();
           refreshCorrectButton();
           if (!value || (value === heardText && !correctionFailed)) return;
+          noteCardSignal(cardApi, "corrected");
+          // What the card says from now on is the corrected sentence, not
+          // the spoken one the report is about.
+          cardReportIds.delete(cardApi);
           void correctHeardText(cardApi, value, { languageA, languageB });
         };
         if (correctBtn) correctBtn.addEventListener("click", openCorrectEditor);
@@ -4159,6 +4469,7 @@
             // Another sentence is being recorded or translated: the button
             // stays, for later.
             if (!retryHandler || isRecording || processing || tapStartActive || keyboardHoldActive) return;
+            noteCardSignal(cardApi, "retried");
             void retryHandler();
           });
         }
@@ -4313,16 +4624,52 @@
         document.head.appendChild(script);
       }
 
-      const translationCameOutWrong = ({ sourceText, translatedText, languageA, languageB }) => {
+      // Also an answer far shorter than what was heard (most of the sentence
+      // left out), unless its text is missing or stopped halfway: then its
+      // length says nothing, and the spoken audio is written down instead.
+      const translationCameOutWrong = ({
+        sourceText,
+        translatedText,
+        languageA,
+        languageB,
+        textMissing = false,
+        textIncomplete = false,
+        translatedTextIncomplete = false
+      }) => {
         const checker = window.LiveTalkTranslationLanguage;
         if (!checker) return false;
         try {
-          return checker.isWrongLanguage({ sourceText, translatedText, languageA, languageB });
+          return checker.isWrongLanguage({
+            sourceText,
+            translatedText,
+            languageA,
+            languageB,
+            translationIncomplete: Boolean(textMissing || textIncomplete || translatedTextIncomplete)
+          });
         } catch (error) {
           // A broken check must never cost a good translation.
           console.warn("Translation language check failed.", error);
           return false;
         }
+      };
+
+      // What the card says under an answer still thrown away after the
+      // retries: one that left most of the sentence out was translated, in
+      // part, so "not translated" would be wrong.
+      const wrongAnswerNotice = ({ sourceText, translatedText, languageA, languageB }) => {
+        try {
+          const checker = window.LiveTalkTranslationLanguage;
+          if (
+            checker &&
+            checker.checkTranslationLanguage({ sourceText, translatedText, languageA, languageB }) ===
+              "much-shorter"
+          ) {
+            return "Only part of this one was translated. Please say it again.";
+          }
+        } catch {
+          // The plainer notice below.
+        }
+        return "This one was not translated. Please say it again.";
       };
 
       // A button held with nothing said: the recording is as quiet as an
@@ -4391,7 +4738,10 @@
       // chosen pair, or neither the heard words nor the translation hold any
       // of the pair's writing: the speech was too quiet to make out (or there
       // was none), and the words were made up.
-      const heardTextIsMadeUp = ({ sourceText, translatedText, languageA, languageB }) => {
+      // `recordingSeconds`, when known: a translation far longer than anything
+      // said in that time is made up too (a 0.5 s press came back as 3.4 s of
+      // speech; see isTooLongForRecording).
+      const heardTextIsMadeUp = ({ sourceText, translatedText, languageA, languageB, recordingSeconds = 0 }) => {
         const checker = window.LiveTalkTranslationLanguage;
         if (!checker || !checker.isHeardTextOutsidePair) return false;
         try {
@@ -4400,6 +4750,10 @@
             Boolean(
               checker.isTurnOutsidePair &&
                 checker.isTurnOutsidePair({ sourceText, translatedText, languageA, languageB })
+            ) ||
+            Boolean(
+              checker.isTooLongForRecording &&
+                checker.isTooLongForRecording({ translatedText, recordingSeconds })
             )
           );
         } catch (error) {
@@ -4449,7 +4803,8 @@
               sourceText: outcome.sourceText,
               translatedText: outcome.translatedText,
               languageA,
-              languageB
+              languageB,
+              translationIncomplete: Boolean(outcome.textMissing || outcome.textIncomplete)
             });
           }
         } catch {
@@ -4461,7 +4816,14 @@
         let reason = "wrong-language";
         if (cutShort) reason = "cut-short";
         else if (outcome.stoppedEarly) reason = "not-translated";
-        else if (verdict === "third-language" || verdict === "not-translated") reason = verdict;
+        else if (
+          verdict === "third-language" ||
+          verdict === "not-translated" ||
+          verdict === "partly-translated" ||
+          verdict === "much-shorter"
+        ) {
+          reason = verdict;
+        }
         return {
           reason,
           stoppedEarly: Boolean(outcome.stoppedEarly),
@@ -4636,7 +4998,8 @@
               sourceText: result.sourceText,
               translatedText: result.translatedText,
               languageA,
-              languageB
+              languageB,
+              translatedTextIncomplete: result.translatedTextIncomplete
             }),
           isWrongSoFar: ({ sourceText, translatedText }) =>
             translationNotTranslatedSoFar({ sourceText, translatedText, languageA, languageB }),
@@ -4735,11 +5098,14 @@
                   sourceText: result.sourceText,
                   translatedText: shownTranslation,
                   languageA,
-                  languageB
+                  languageB,
+                  translatedTextIncomplete: result.translatedTextIncomplete
                 })
               ) {
                 // Wrong again on the second try (or it could not be retried).
-                turn.card.setNotice("This one was not translated. Please say it again.");
+                turn.card.setNotice(
+                  wrongAnswerNotice({ sourceText: result.sourceText, translatedText: shownTranslation, languageA, languageB })
+                );
               } else if (result.noAudio) {
                 // No audio and, once stray markers are removed, no text either:
                 // there is nothing to read.
@@ -5550,6 +5916,9 @@
             (error) => noteDirectConnectFailure(error)
           );
         }
+        // How long it had waited for this press, for the turn report.
+        turn.waitAtPress =
+          typeof turn.session.describeWait === "function" ? turn.session.describeWait() : null;
         turn.session.begin();
         // The second connection for this turn (and the next press).
         prepareGeminiDirectStandby();
@@ -5583,6 +5952,9 @@
       // Failures of a direct attempt that come from the connection (see the
       // reasons in gemini-direct.js), not from Gemini's answer.
       const CONNECTION_FAILURE_REASONS = new Set(["not-ready", "connection", "lease"]);
+      // Failures of a direct attempt where Gemini was reached and said
+      // nothing: no sound before the wait ran out, or an answer with none.
+      const GEMINI_SILENT_RESULTS = new Set(["first-audio-timeout", "no-audio"]);
 
       // --- No connection ----------------------------------------------------
       // How many times in a row the page could not reach the network (a
@@ -5741,7 +6113,7 @@
       // (3-4 s in all, 11 of 124 turns on 2026-11-17). `onFirstSound`: its
       // first translated sound has come.
       const holdDirectAnswer = (turn, { onFirstSound = null } = {}) => {
-        const held = { events: [], firstSoundAt: 0, heardText: "", translatedText: "" };
+        const held = { events: [], firstSoundAt: 0, heardText: "", translatedText: "", result: null };
         const keep = (name) => (value) => {
           held.events.push([name, value]);
           if (name === "onSourceText") held.heardText = String(value || "");
@@ -5755,8 +6127,48 @@
         turn.session.handlers.onTranslatedTextDelta = keep("onTranslatedTextDelta");
         turn.session.handlers.onSourceText = keep("onSourceText");
         turn.held = held;
-        void turn.session.end();
+        // Once it is over, what it came to: an answer that has finished
+        // before it is used is checked before anyone hears it
+        // (heldAnswerFault). A failure is met again when it is used.
+        turn.session.end().then(
+          (result) => {
+            held.result = result;
+          },
+          () => {}
+        );
         return held;
+      };
+
+      // Why a kept answer (holdDirectAnswer) is not to be played, "" when
+      // nothing is known against it. From its first words: heard as some
+      // other language, or said back untranslated. Once it is over: in the
+      // wrong language, or its voice stopped long before the end of its
+      // text. On 2026-11-17/18 such an answer was played after the first
+      // had been thrown away; twice the listener heard half a sentence and
+      // was told to read the text, and once it held up the next attempt.
+      const heldAnswerFault = (held, { languageA, languageB }) => {
+        if (!held) return "";
+        const result = held.result;
+        const sourceText = (result && result.sourceText) || held.heardText;
+        const translatedText = (result && result.translatedText) || held.translatedText;
+        if (heardSoFarIsMadeUp({ sourceText, languageA, languageB })) return "made-up";
+        if (translationNotTranslatedSoFar({ sourceText, translatedText, languageA, languageB })) {
+          return "not-translated";
+        }
+        if (!result) return "";
+        if (
+          translationCameOutWrong({
+            sourceText,
+            translatedText,
+            languageA,
+            languageB,
+            translatedTextIncomplete: result.translatedTextIncomplete
+          })
+        ) {
+          return "wrong-language";
+        }
+        if (result.translatedAudioCutShort) return "cut-short";
+        return "";
       };
 
       // Sends a whole recording to a waiting connection, half a second of
@@ -5845,6 +6257,13 @@
       // gemini-direct.js, or why its answer was thrown away). The report is
       // added to the usage record of the turn's last attempt
       // (/api/turn-report), so slow turns can be counted by cause.
+      // How many times the page has gone into the background: an attempt
+      // during which it did is marked `hidden` in the turn report. A phone
+      // locked or switched to another app can break a request midway.
+      let pageHiddenCount = 0;
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState !== "visible") pageHiddenCount += 1;
+      });
       const createTurnTimer = () => {
         const releasedAt = performance.now();
         const since = () => Math.round(performance.now() - releasedAt);
@@ -5859,7 +6278,9 @@
               firstAudioMs: null,
               endMs: null,
               result: "",
-              requestId: ""
+              requestId: "",
+              hidden: false,
+              hiddenCountAtStart: pageHiddenCount
             };
             attempts.push(attempt);
             return attempt;
@@ -5871,6 +6292,8 @@
             if (attempt.endMs !== null) return;
             attempt.endMs = since();
             attempt.result = result;
+            attempt.hidden =
+              pageHiddenCount > attempt.hiddenCountAtStart || document.visibilityState !== "visible";
           },
           // The last attempt's answer came back but is not used as it is.
           reject(reason) {
@@ -5883,7 +6306,7 @@
       const describeAttemptFailure = (error) => {
         if (!error) return "error";
         if (error.cancelled) return "cancelled";
-        if (typeof error.reason === "string" && /^[a-z][a-z-]{0,31}$/.test(error.reason)) {
+        if (typeof error.reason === "string" && /^[a-z][a-z0-9-]{0,31}$/.test(error.reason)) {
           return error.reason;
         }
         return error.audioStarted ? "failed-while-speaking" : "error";
@@ -5894,9 +6317,27 @@
       // `parallelSoundMs`: when the second connection's kept answer first
       // sounded (null: never), given only when there was one.
       // `speech`: where the speaker fell quiet (see describeRecordingSpeech).
+      // `directWait`: how long the first connection had waited before the
+      // press (describeWait in gemini-direct.js), null without one.
+      // Attempts whose usage record the report is not added to: one given
+      // up (its record says little), or a server request whose answer
+      // stopped arriving (the server may finish it, and write its record,
+      // long after the report is sent).
+      // The request carrying the last report (see reportPlaybackFor).
+      let lastTurnReportRequest = null;
+      const TURN_REPORT_NOT_RECORDED = new Set(["cancelled", "overtaken", "stream-broken", "network"]);
       const sendTurnReport = (
         turnTimer,
-        { recordingMs, outcome, noDirect = "", parallelSoundMs, speech = null }
+        {
+          recordingMs,
+          outcome,
+          noDirect = "",
+          parallelSoundMs,
+          speech = null,
+          directWait = null,
+          micWaitMs = null,
+          text = null
+        }
       ) => {
         const attempts = turnTimer.attempts;
         const last = attempts[attempts.length - 1];
@@ -5904,10 +6345,11 @@
         const recorded = attempts
           .filter(
             (attempt) =>
-              attempt.requestId && attempt.result !== "cancelled" && attempt.result !== "overtaken"
+              attempt.requestId && !TURN_REPORT_NOT_RECORDED.has(attempt.result)
           )
           .pop();
-        if (!last || !recorded) return;
+        if (!last || !recorded) return "";
+        const missed = takeMissedPresses();
         const sounds = attempts
           .map((attempt) => attempt.firstAudioMs)
           .filter((ms) => ms !== null);
@@ -5918,24 +6360,147 @@
           outcome,
           ...(noDirect ? { noDirect } : {}),
           ...(parallelSoundMs !== undefined ? { parallelSoundMs } : {}),
+          ...(directWait ? { directWait } : {}),
+          // Letting the button go -> recording (the microphone opening).
+          ...(micWaitMs !== null ? { micWaitMs } : {}),
+          // Presses since the last report that never became a sentence.
+          ...(missed.length ? { missed } : {}),
           speech,
-          attempts: attempts.map(({ path, startMs, firstAudioMs, endMs, result }) => ({
+          attempts: attempts.map(({ path, startMs, firstAudioMs, endMs, result, requestId, acceptedRequestId, hidden }) => ({
             path,
             startMs,
             firstAudioMs,
             endMs,
-            result: result || "unfinished"
+            result: result || "unfinished",
+            // Its usage record: the report itself goes on one record only.
+            ...(requestId || acceptedRequestId ? { requestId: requestId || acceptedRequestId } : {}),
+            ...(hidden ? { hidden: true } : {})
           }))
         };
+        lastTurnReportRequest = fetch("/api/turn-report", {
+          method: "POST",
+          headers: turnReportHeaders(),
+          // `text`: what was heard and said. The site keeps it only where it
+          // has been asked to, for checking translations afterwards.
+          body: JSON.stringify({ requestId: recorded.requestId, turn, ...(text ? { text } : {}) }),
+          keepalive: true
+        })
+          .then((response) => {
+            // Not taken: they go with the next report.
+            if (!response.ok) putBackMissedPresses(missed);
+          })
+          .catch(() => putBackMissedPresses(missed));
+        return recorded.requestId;
+      };
+
+      // How the translation of a reported sentence played (playbackHealth),
+      // sent once it has finished playing and added to that sentence's
+      // report. Never before the report itself has been taken: both change
+      // the same record.
+      const reportPlaybackFor = (requestId) => {
+        const health = playbackHealth;
+        if (!requestId || !health || !health.pieces || health.requestId) return;
+        health.requestId = requestId;
+        health.after = lastTurnReportRequest;
+        if (health.done) {
+          sendPlaybackReport(health);
+        } else if (!streamingPlaybackSources.size && !heldPlaybackPiece) {
+          // Already played to its end; otherwise its last sound closes it.
+          finishPlaybackHealth(false);
+        }
+      };
+      const sendPlaybackReport = (health) => {
+        const playback = {
+          pieces: health.pieces,
+          audioMs: Math.round(health.audioMs),
+          aheadMs: health.aheadMs,
+          lateCount: health.lateCount,
+          late: health.late,
+          notRunning: health.notRunning,
+          clockLagMs: health.clockLagMs,
+          underruns: health.underruns,
+          underrunMs: health.underrunMs,
+          ...(health.cut ? { cut: true } : {})
+        };
+        const requestId = health.requestId;
+        Promise.resolve(health.after)
+          .catch(() => {})
+          .then(() =>
+            fetch("/api/turn-report", {
+              method: "POST",
+              headers: turnReportHeaders(),
+              body: JSON.stringify({ requestId, playback }),
+              keepalive: true
+            })
+          )
+          .catch(() => {});
+      };
+
+      const turnReportHeaders = () => {
         const headers = { "Content-Type": "application/json" };
         const accessToken = siteAccess.token();
         if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+        return headers;
+      };
+
+      // What the person did with a sentence's card after it was translated,
+      // a sign the translation was not right: played it again ("replayed"),
+      // tried a failed one again ("retried"), corrected the heard words
+      // ("corrected"). Added to the report of that sentence.
+      const cardReportIds = new WeakMap();
+      const noteCardSignal = (card, signal) => {
+        const requestId = card ? cardReportIds.get(card) : "";
+        if (!requestId) return;
         void fetch("/api/turn-report", {
           method: "POST",
-          headers,
-          body: JSON.stringify({ requestId: recorded.requestId, turn }),
+          headers: turnReportHeaders(),
+          body: JSON.stringify({ requestId, signal }),
           keepalive: true
         }).catch(() => {});
+      };
+
+      // Presses that never became a sentence: too short, nothing heard, the
+      // microphone did not open, no connection, given up while the
+      // microphone was opening. Kept on the device (they have no record of
+      // their own) and sent with the next sentence's report.
+      const MISSED_PRESSES_STORAGE_KEY = "vt-missed-presses";
+      const MISSED_PRESSES_MAX = 20;
+      const readMissedPresses = () => {
+        try {
+          const stored = JSON.parse(window.localStorage?.getItem(MISSED_PRESSES_STORAGE_KEY) || "[]");
+          return Array.isArray(stored) ? stored : [];
+        } catch {
+          return [];
+        }
+      };
+      const writeMissedPresses = (presses) => {
+        try {
+          if (presses.length) {
+            window.localStorage?.setItem(
+              MISSED_PRESSES_STORAGE_KEY,
+              JSON.stringify(presses.slice(-MISSED_PRESSES_MAX))
+            );
+          } else {
+            window.localStorage?.removeItem(MISSED_PRESSES_STORAGE_KEY);
+          }
+        } catch {
+          // ignored
+        }
+      };
+      const noteMissedPress = (kind, { micWaitMs = null, heldMs = null } = {}) => {
+        const round = (ms) => (Number.isFinite(ms) && ms >= 0 ? Math.round(ms) : null);
+        writeMissedPresses([
+          ...readMissedPresses(),
+          { kind, at: Date.now(), micWaitMs: round(micWaitMs), heldMs: round(heldMs) }
+        ]);
+      };
+      const takeMissedPresses = () => {
+        const presses = readMissedPresses();
+        if (presses.length) writeMissedPresses([]);
+        return presses;
+      };
+      const putBackMissedPresses = (presses) => {
+        if (presses.length) writeMissedPresses([...presses, ...readMissedPresses()]);
       };
 
       // One line for the usage record of a direct turn that failed before
@@ -6383,7 +6948,7 @@
           card.setCorrectionFailed(false);
           if (correction) card.markCorrected();
           if (translationCameOutWrong({ ...outcome, sourceText: text, languageA, languageB })) {
-            card.setNotice("This one was not translated. Please say it again.");
+            card.setNotice(wrongAnswerNotice({ ...outcome, sourceText: text, languageA, languageB }));
           } else if (outcome.readAloudBrokeOff) {
             card.setNotice("This one was not read aloud in full. Please read the text.");
           } else if (outcome.textMissing || outcome.textIncomplete) {
@@ -6438,10 +7003,16 @@
           conversationToken = conversationResetToken,
           heardText = "",
           retry = null,
+          // "openai" to have the server skip Gemini (see streamTranslateTurn).
+          engine = "",
           // Called once, when the first translated sound is queued to play.
           onFirstAudio = null,
-          // Called with the id of this turn's usage record on the server.
-          onRequestId = null
+          // Called with the id of this turn's usage record on the server,
+          // once the server has finished with it ("done" or "error").
+          onRequestId = null,
+          // Called with the same id as soon as the server takes the request
+          // ("accepted"): its record may not exist for a long while yet.
+          onRequestAccepted = null
         } = {}
       ) => {
         if (conversationToken !== conversationResetToken) {
@@ -6476,6 +7047,9 @@
         let hasAudio = false;
         let textIncomplete = false;
         let audioCutShort = false;
+        // Which model the server answered with ("gemini", "openai"; "" if
+        // it did not say).
+        let answeredEngine = "";
 
         resetStreamingPlaybackQueue();
         await siteAccess.ready();
@@ -6488,6 +7062,7 @@
           voice: DEFAULT_VOICE,
           accessToken,
           retry,
+          engine,
           onEvent: (event) => {
             if (conversationToken !== conversationResetToken) {
               return createConversationResetError();
@@ -6528,6 +7103,7 @@
 
             if (event.type === "done") {
               if (onRequestId && typeof event.requestId === "string") onRequestId(event.requestId);
+              if (typeof event.engine === "string") answeredEngine = event.engine;
               if (event.engine === "gemini") {
                 enableGeminiDirect();
               }
@@ -6550,7 +7126,16 @@
 
             if (event.type === "error" && typeof event.message === "string") {
               if (onRequestId && typeof event.requestId === "string") onRequestId(event.requestId);
-              return new Error(event.message);
+              const serverError = new Error(event.message);
+              serverError.reason = "server-error";
+              return serverError;
+            }
+
+            // Sent first, so the turn report can name this request even if
+            // the answer never arrives.
+            if (event.type === "accepted") {
+              if (onRequestAccepted && typeof event.requestId === "string") onRequestAccepted(event.requestId);
+              return null;
             }
             return null;
           }
@@ -6574,6 +7159,7 @@
           textMissing: !translatedText.trim(),
           textIncomplete,
           audioCutShort,
+          engine: answeredEngine,
           audioChunks: streamedAudioChunks
         };
       };
@@ -6802,22 +7388,40 @@
         card.setSourceText(text);
       };
 
+      // A press the microphone did not start recording for: counted unless
+      // it was turned away for a reason not worth counting (busy, a help
+      // window open).
+      const noteUnstartedPress = (prepareResult, pressedAt) => {
+        const action = prepareResult?.action || "";
+        const kind =
+          action === MIC_PREPARE_RECORDING_ACTIONS.BLOCKED
+            ? prepareResult.blockedBy || ""
+            : action === MIC_PREPARE_RECORDING_ACTIONS.PERMISSION_READY
+              ? "permission-asked"
+              : action
+                ? `mic-${action}`
+                : "mic-failed";
+        if (kind) noteMissedPress(kind, { micWaitMs: performance.now() - pressedAt });
+      };
+
+      // `blockedBy` names why a press was turned away, for the turn report
+      // (noteUnstartedPress); "" when it is not worth counting.
       const prepareRecordingStart = async () => {
         if (isRecording || processing) {
-          return { action: MIC_PREPARE_RECORDING_ACTIONS.BLOCKED };
+          return { action: MIC_PREPARE_RECORDING_ACTIONS.BLOCKED, blockedBy: "" };
         }
         if (isMicHelpModalOpen) {
-          return { action: MIC_PREPARE_RECORDING_ACTIONS.BLOCKED };
+          return { action: MIC_PREPARE_RECORDING_ACTIONS.BLOCKED, blockedBy: "" };
         }
         if (siteAccess.limited()) {
           siteAccess.showLimit();
-          return { action: MIC_PREPARE_RECORDING_ACTIONS.BLOCKED };
+          return { action: MIC_PREPARE_RECORDING_ACTIONS.BLOCKED, blockedBy: "site-refused" };
         }
         // No connection: say so now, not after a whole sentence.
         if (await connectionIsDown()) {
           setIdleInstructionMode("offline");
           nudgeMicButton();
-          return { action: MIC_PREPARE_RECORDING_ACTIONS.BLOCKED };
+          return { action: MIC_PREPARE_RECORDING_ACTIONS.BLOCKED, blockedBy: "offline" };
         }
         closeAllPopovers();
 
@@ -6826,13 +7430,13 @@
         } catch (error) {
           const message = error instanceof Error ? error.message : "The page could not get ready.";
           console.warn(message);
-          return { action: MIC_PREPARE_RECORDING_ACTIONS.BLOCKED };
+          return { action: MIC_PREPARE_RECORDING_ACTIONS.BLOCKED, blockedBy: "page-not-ready" };
         }
 
         const accessToken = siteAccess.token();
         if (siteAccess.required() && !accessToken) {
           siteAccess.invite();
-          return { action: MIC_PREPARE_RECORDING_ACTIONS.BLOCKED };
+          return { action: MIC_PREPARE_RECORDING_ACTIONS.BLOCKED, blockedBy: "site-refused" };
         }
 
         const permissionStateBefore = await syncMicrophonePermissionState();
@@ -6885,6 +7489,11 @@
               error,
               waitedMs: performance.now() - promptWaitStartedAt
             }),
+            // Counted as a press the microphone failed (noteUnstartedPress).
+            blockedBy: `mic-${String((error && error.name) || "failed")
+              .toLowerCase()
+              .replace(/[^a-z0-9-]/g, "")
+              .slice(0, 24)}`,
             error
           };
         }
@@ -6895,6 +7504,9 @@
 
         setMicPreparing(false);
         isRecording = true;
+        recordingStartedAt = performance.now();
+        recordingMicWaitMs = recordingPressAt ? Math.round(recordingStartedAt - recordingPressAt) : null;
+        recordingPressAt = 0;
         recordingChunks = [];
         recordingSettlingChunks = 0;
         recordingDuration = 0;
@@ -6946,6 +7558,8 @@
 
         keyboardHoldActive = true;
         const pressToken = ++keyboardPressToken;
+        const pressedAt = performance.now();
+        recordingPressAt = pressedAt;
         if (
           idleInstructionMode === "too-short" ||
           idleInstructionMode === "no-audio" ||
@@ -6955,15 +7569,23 @@
           setIdleInstructionMode("default");
         }
 
-        if (!mediaStream) setMicPreparing(true);
+        const stopShowingPreparing = showMicPreparing(
+          () => keyboardHoldActive && keyboardPressToken === pressToken
+        );
         const prepareResult = await prepareRecordingStart();
+        stopShowingPreparing();
         if (keyboardPressToken === pressToken || !isRecordingIntentActive()) setMicPreparing(false);
         if (!keyboardHoldActive || keyboardPressToken !== pressToken) {
+          // Let go before the microphone was open.
+          if (prepareResult?.action === MIC_PREPARE_RECORDING_ACTIONS.START_RECORDING) {
+            noteMissedPress("gave-up-opening", { micWaitMs: performance.now() - pressedAt });
+          }
           finalizePreparedMicrophoneAttempt(prepareResult);
           return;
         }
         if (prepareResult?.action !== MIC_PREPARE_RECORDING_ACTIONS.START_RECORDING) {
           keyboardHoldActive = false;
+          noteUnstartedPress(prepareResult, pressedAt);
           finalizePreparedMicrophoneAttempt(prepareResult);
           return;
         }
@@ -7006,7 +7628,9 @@
             heardTextIsMadeUp({
               sourceText: outcome.sourceText,
               translatedText: outcome.translatedText,
-              ...turnLanguages
+              ...turnLanguages,
+              // 24 kHz, 16-bit: 48,000 bytes a second.
+              recordingSeconds: (audioBase64.length * 3) / 4 / 48000
             })
           ) {
             // As after a first attempt: noise taken for a sentence.
@@ -7019,7 +7643,7 @@
           const wrongLanguage = translationCameOutWrong({ ...outcome, ...turnLanguages });
           card.setPhase("result");
           if (wrongLanguage) {
-            card.setNotice("This one was not translated. Please say it again.");
+            card.setNotice(wrongAnswerNotice({ ...outcome, ...turnLanguages }));
           } else if (outcome.audioCutShort) {
             card.setNotice("This one was not read aloud in full. Please read the text.");
           } else if (outcome.textMissing || outcome.textIncomplete) {
@@ -7062,6 +7686,8 @@
 
         if (!isRecording) return;
         const durationAtStop = recordingDuration;
+        const micWaitAtStop = recordingMicWaitMs;
+        recordingMicWaitMs = null;
         const chunks = recordingChunks;
         const settlingChunks = recordingSettlingChunks;
         const directTurn = manualDirectTurn;
@@ -7098,6 +7724,10 @@
             parallelTurn.session.cancel();
           }
           prepareGeminiDirectStandby();
+          noteMissedPress(!chunks.length && durationAtStop >= MIN_RECORDING_MS ? "no-sound-in" : "too-short", {
+            micWaitMs: micWaitAtStop,
+            heldMs: durationAtStop
+          });
           if (!chunks.length && durationAtStop >= MIN_RECORDING_MS) {
             // Held long enough, yet no sound came in: the page's audio was
             // not running. Close everything so the next press starts afresh.
@@ -7124,6 +7754,7 @@
               chunks.reduce((max, chunk) => Math.max(max, calculateFloat32Rms(chunk)), 0).toFixed(4)
             )
           });
+          noteMissedPress("silent", { micWaitMs: micWaitAtStop, heldMs: durationAtStop });
           if (directTurn) {
             directTurn.session.cancel();
           }
@@ -7184,10 +7815,31 @@
         // that it adds nothing to the wait.
         const sampleRateAtStop = inputSampleRate;
         let turnOutcome = "error";
+        // What was heard and said in the end, and every answer thrown away
+        // on the way (see sendTurnReport).
+        let finalWords = null;
+        const thrownAway = [];
+        // (Cut to the length the server keeps.)
+        const TURN_TEXT_MAX_LENGTH = 1000;
+        const noteThrownAway = (path, result, translatedText) => {
+          thrownAway.push({ path, result, translated: String(translatedText || "").slice(0, TURN_TEXT_MAX_LENGTH) });
+        };
         // Letting go -> first sound of the second connection's answer (kept
         // while the first was tried, see holdDirectAnswer, or played); null
         // if it never spoke.
         let parallelSoundMs = null;
+        // Answers to this recording that Gemini got wrong: no sound at all,
+        // or an answer thrown away (said back untranslated, in another
+        // language, its voice stopped halfway). When Gemini fails a sentence
+        // it tends to fail it on every connection: on 2026-11-17/18, five
+        // times the first two were both silent, and each time so was the
+        // backup (another 2.7 s), and the server's own Gemini half the time
+        // (up to 7 s more, then OpenAI): 9-16 s before anything was heard;
+        // and twice one said it back and the next stopped speaking halfway.
+        // After two such answers no new Gemini attempt is started: the
+        // server goes straight to OpenAI.
+        let geminiBadAnswers = 0;
+        const geminiFailedTwice = () => geminiBadAnswers >= 2;
         const runDirectAttempt = async (path, turn, options) => {
           const attempt = turnTimer.start(path);
           try {
@@ -7202,7 +7854,14 @@
             turnTimer.finish(attempt, "ok");
             return result;
           } catch (error) {
-            turnTimer.finish(attempt, turn.overtaken ? "overtaken" : describeAttemptFailure(error));
+            const result = turn.overtaken ? "overtaken" : describeAttemptFailure(error);
+            turnTimer.finish(attempt, result);
+            // One given up because the other spoke first had been silent
+            // until then: should that other answer prove no good, both
+            // connections have failed the sentence, and no third Gemini
+            // session is started. Of 8 such backups on 2026-11-17/18, 2
+            // spoke; the other 6 added about 2.7 s before OpenAI was asked.
+            if (GEMINI_SILENT_RESULTS.has(result) || result === "overtaken") geminiBadAnswers += 1;
             throw error;
           } finally {
             const lease = turn.session.getLease();
@@ -7210,14 +7869,22 @@
           }
         };
         const runServerAttempt = async (options = {}) => {
-          const attempt = turnTimer.start("server");
+          const engine = geminiFailedTwice() ? "openai" : "";
+          // Counted apart in the turn report (scripts/turn-wait-report.js).
+          const attempt = turnTimer.start(engine ? "server-openai" : "server");
           try {
             const result = await processTranslation(card, getRecordedAudioBase64(), {
               ...options,
+              engine,
               conversationToken,
               onFirstAudio: () => turnTimer.heard(attempt),
               onRequestId: (requestId) => {
                 attempt.requestId = requestId;
+              },
+              // Named in the turn report only: the report is added to the
+              // record of a request the server has finished with.
+              onRequestAccepted: (requestId) => {
+                attempt.acceptedRequestId = requestId;
               }
             });
             turnTimer.finish(attempt, "ok");
@@ -7310,6 +7977,35 @@
             return tryReadAloud(error);
           }
         };
+        // A kept answer seen to be no good before it was played: it is not
+        // played, and counts as one more answer Gemini got wrong. Reported
+        // as an attempt that ended at once ("skipped-cut-short", ...).
+        const skipHeldAnswer = (path, turn, fault) => {
+          const held = turn.held;
+          noteThrownAway(
+            path,
+            `skipped-${fault}`,
+            held ? (held.result && held.result.translatedText) || held.translatedText : ""
+          );
+          turn.session.cancel();
+          const attempt = turnTimer.start(path);
+          turnTimer.finish(attempt, `skipped-${fault}`);
+          geminiBadAnswers += 1;
+        };
+        // The connection kept waiting, sent the recording as soon as the
+        // second answer was seen going wrong while the first had not spoken
+        // (19:17 on 2026-11-18: the first stayed silent until its wait ran
+        // out at 2.6 s, and only then was the backup asked, heard at 5.0 s).
+        // Its answer is kept like the second one's.
+        let earlyBackup = null;
+        const startEarlyBackup = () => {
+          if (earlyBackup || geminiFailedTwice()) return;
+          const backup = takeGeminiDirectBackup(turnLanguages);
+          if (!backup) return;
+          sendRecordingToDirectTurn(backup, chunks);
+          holdDirectAnswer(backup);
+          earlyBackup = backup;
+        };
         // `readyOnly`: the first attempt failed for want of a connection. The
         // others were opened at the same moment over the same network, and
         // one still connecting would only add its own wait for it.
@@ -7320,12 +8016,28 @@
           // no slower than any other (a finished one is no longer "ready").
           // One still connecting is not waited for.
           const heldAnswerStarted = Boolean(parallel && parallel.held && parallel.held.events.length);
-          if (parallel && (!readyOnly || heldAnswerStarted || parallel.session.isReady())) {
+          const parallelFault = parallel ? heldAnswerFault(parallel.held, turnLanguages) : "";
+          if (parallelFault) {
+            skipHeldAnswer("parallel", parallel, parallelFault);
+          } else if (parallel && (!readyOnly || heldAnswerStarted || parallel.session.isReady())) {
             const outcome = await tryDirectRetry("parallel", parallel, options);
             if (outcome) return outcome;
           } else if (parallel) {
             parallel.session.cancel();
           }
+          // A backup already on its way is used however many answers went
+          // wrong: it is nearer an answer than anything asked now.
+          const early = earlyBackup;
+          earlyBackup = null;
+          if (early) {
+            const earlyFault = heldAnswerFault(early.held, turnLanguages);
+            if (!earlyFault) return tryDirectRetry("backup", early, options);
+            skipHeldAnswer("backup", early, earlyFault);
+            return null;
+          }
+          // Gemini is not asked a third time (see geminiBadAnswers); the
+          // backup stays for the next press.
+          if (geminiFailedTwice()) return null;
           const backup = takeGeminiDirectBackup(turnLanguages, { readyOnly });
           if (!backup) return null;
           sendRecordingToDirectTurn(backup, chunks);
@@ -7355,14 +8067,11 @@
                   // Not for an answer already seen to be thrown away (heard
                   // as some other language, or said back untranslated): the
                   // first may yet bring a good one.
-                  const keptLooksWrong =
-                    !held ||
-                    heardSoFarIsMadeUp({ sourceText: held.heardText, ...turnLanguages }) ||
-                    translationNotTranslatedSoFar({
-                      sourceText: held.heardText,
-                      translatedText: held.translatedText,
-                      ...turnLanguages
-                    });
+                  const keptLooksWrong = !held || Boolean(heldAnswerFault(held, turnLanguages));
+                  const firstStillSilent =
+                    firstAttemptRunning &&
+                    unusedParallelTurn === parallelTurn &&
+                    !(directTurn.session.getUsage().outputSeconds > 0);
                   if (
                     !keptLooksWrong &&
                     firstAttemptRunning &&
@@ -7371,6 +8080,10 @@
                   ) {
                     directTurn.overtaken = true;
                     directTurn.session.cancel();
+                  } else if (held && keptLooksWrong && firstStillSilent) {
+                    // Should the first fail too, the next answer is already
+                    // on its way.
+                    startEarlyBackup();
                   }
                 }
               });
@@ -7410,7 +8123,14 @@
               // A kept answer that is already speaking is played before the
               // first one's words are read aloud: it is there now, in
               // Gemini's own voice.
-              const keptAnswerSpeaking = overtaken || Boolean(parallelTurn && parallelSoundMs !== null);
+              // (Not one already seen to be no good: it will not be played.)
+              const keptAnswerSpeaking =
+                overtaken ||
+                Boolean(
+                  parallelTurn &&
+                    parallelSoundMs !== null &&
+                    !heldAnswerFault(parallelTurn.held, turnLanguages)
+                );
               outcome = keptAnswerSpeaking
                 ? (await tryBackupAttempt(firstAttemptOptions, backupOptions)) || (await tryReadAloud(error))
                 : (await tryReadAloud(error)) || (await tryBackupAttempt(firstAttemptOptions, backupOptions));
@@ -7439,30 +8159,42 @@
             return;
           }
           noteConnectionWorking();
-          if (
-            heardTextIsMadeUp({
-              sourceText: outcome.sourceText,
-              translatedText: outcome.translatedText,
-              ...turnLanguages
-            })
-          ) {
+          // How much sound was recorded (the microphone may have opened late).
+          const recordingSeconds = sampleRateAtStop
+            ? chunks.reduce((sum, chunk) => sum + chunk.length, 0) / sampleRateAtStop
+            : 0;
+          const madeUpTurn = {
+            sourceText: outcome.sourceText,
+            translatedText: outcome.translatedText,
+            ...turnLanguages
+          };
+          if (heardTextIsMadeUp({ ...madeUpTurn, recordingSeconds })) {
             // Speech too quiet to make out, or noise, and a sentence made up
             // from it: no card, no second attempt at translating it, and a
-            // request to say it again.
-            console.warn("Heard text is in a language outside the pair, dropping the turn.", {
-              ...turnLanguages,
-              heard: outcome.sourceText,
-              translated: outcome.translatedText,
-              // For checking the silence level against real use: how loud
-              // the first second was, frame by frame, and how much of it
-              // was taken while the microphone was settling.
-              settlingChunks,
-              firstLevels: chunks
-                .slice(0, 12)
-                .map((chunk) => Number(calculateFloat32Rms(chunk).toFixed(4)))
-            });
-            turnTimer.reject("made-up");
-            turnOutcome = "made-up";
+            // request to say it again. "too-long": made up because no one
+            // could say that much in the time the button was held.
+            const madeUpReason = heardTextIsMadeUp(madeUpTurn) ? "made-up" : "too-long";
+            console.warn(
+              madeUpReason === "too-long"
+                ? "Translation is far longer than the recording, dropping the turn."
+                : "Heard text is in a language outside the pair, dropping the turn.",
+              {
+                ...turnLanguages,
+                recordingSeconds: Math.round(recordingSeconds * 100) / 100,
+                heard: outcome.sourceText,
+                translated: outcome.translatedText,
+                // For checking the silence level against real use: how loud
+                // the first second was, frame by frame, and how much of it
+                // was taken while the microphone was settling.
+                settlingChunks,
+                firstLevels: chunks
+                  .slice(0, 12)
+                  .map((chunk) => Number(calculateFloat32Rms(chunk).toFixed(4)))
+              }
+            );
+            turnTimer.reject(madeUpReason);
+            turnOutcome = madeUpReason;
+            finalWords = { heard: outcome.sourceText, translated: outcome.translatedText };
             stopStreamingPlayback();
             if (card) card.dispose();
             if (activeCard === card) activeCard = null;
@@ -7476,12 +8208,19 @@
           // Gemini stopped speaking long before the end of its own text, so
           // the listener heard a second of the sentence at most.
           let cutShort = !wrongLanguage && outcome.audioCutShort;
-          if (wrongLanguage || cutShort) {
-            // The answer is in a language outside the chosen pair, the
-            // sentence was repeated untranslated, or it was not read out to
-            // the end. Stop it being read out and translate the same
-            // recording once more: on the connection kept waiting if there
-            // is one, else on the server.
+          // Whether the answer in hand came from a Gemini connection on the
+          // page (else from the server, see outcome.engine).
+          let answerViaDirect = handledDirectly;
+          // The answer is in a language outside the chosen pair, the
+          // sentence was repeated untranslated, or it was not read out to
+          // the end. Stop it being read out and translate the same
+          // recording again: on another connection if there is one, else
+          // on the server. Twice at most: an answer Gemini got wrong a
+          // second time is made once more by OpenAI (geminiFailedTwice); a
+          // remade answer from OpenAI is the last.
+          for (let remade = 0; (wrongLanguage || cutShort) && remade < 2; remade += 1) {
+            const viaOpenAI = !answerViaDirect && outcome.engine === "openai";
+            if (remade > 0 && viaOpenAI) break;
             console.warn(
               cutShort
                 ? "Translation was not read out to the end, translating again."
@@ -7494,10 +8233,13 @@
             const rejected = describeRejectedTranslation({
               outcome,
               cutShort,
-              viaDirect: handledDirectly,
+              viaDirect: answerViaDirect,
               ...turnLanguages
             });
             turnTimer.reject(rejected.reason);
+            const rejectedAttempt = turnTimer.attempts[turnTimer.attempts.length - 1];
+            noteThrownAway(rejectedAttempt ? rejectedAttempt.path : "", rejected.reason, outcome.translatedText);
+            if (!viaOpenAI) geminiBadAnswers += 1;
             const heardBefore = outcome.sourceText;
             stopStreamingPlayback();
             if (card) {
@@ -7505,7 +8247,9 @@
               card.setReplayUrl("");
               card.setPhase("translating");
             }
-            const again = await tryBackupAttempt({});
+            // One said back again is stopped as soon as that shows, as the
+            // first was.
+            const again = await tryBackupAttempt({ stopIfNotTranslated: true });
             if (again) {
               outcome = again;
               // The second answer may come without the heard words.
@@ -7513,17 +8257,24 @@
             } else {
               outcome = await runServerAttempt({ heardText: heardBefore, retry: rejected });
             }
+            answerViaDirect = Boolean(again);
             if (conversationToken !== conversationResetToken) {
               return;
             }
-            wrongLanguage = translationCameOutWrong({ ...outcome, ...turnLanguages });
+            wrongLanguage =
+              outcome.stoppedEarly || translationCameOutWrong({ ...outcome, ...turnLanguages });
             cutShort = !wrongLanguage && outcome.audioCutShort;
           }
           turnOutcome = wrongLanguage ? "not-translated" : cutShort ? "cut-short" : "ok";
           if (turnOutcome !== "ok") turnTimer.reject(turnOutcome);
+          finalWords = { heard: outcome.sourceText, translated: outcome.translatedText };
           if (card) card.setPhase("result");
           if (card && wrongLanguage) {
-            card.setNotice("This one was not translated. Please say it again.");
+            card.setNotice(
+              outcome.stoppedEarly
+                ? "This one was not translated. Please say it again."
+                : wrongAnswerNotice({ ...outcome, ...turnLanguages })
+            );
           } else if (card && (cutShort || (outcome && outcome.readAloudBrokeOff))) {
             // Cut short on the second try too (or the reading aloud broke
             // off): the text is whole, the voice is not.
@@ -7554,14 +8305,27 @@
         } finally {
           // Not needed: the first answer was used.
           if (unusedParallelTurn) unusedParallelTurn.session.cancel();
+          if (earlyBackup) earlyBackup.session.cancel();
           if (conversationToken === conversationResetToken) {
-            sendTurnReport(turnTimer, {
+            const reportId = sendTurnReport(turnTimer, {
               recordingMs: durationAtStop,
               outcome: turnOutcome,
               noDirect: directTurn ? "" : noDirectReason,
               ...(directTurn && parallelTurn ? { parallelSoundMs } : {}),
-              speech: describeRecordingSpeech(chunks, sampleRateAtStop, settlingChunks)
+              speech: describeRecordingSpeech(chunks, sampleRateAtStop, settlingChunks),
+              directWait: directTurn ? directTurn.waitAtPress : null,
+              micWaitMs: micWaitAtStop,
+              text: {
+                heard: String((finalWords && finalWords.heard) || (card && card.getHeardText()) || "").slice(
+                  0,
+                  TURN_TEXT_MAX_LENGTH
+                ),
+                translated: String((finalWords && finalWords.translated) || "").slice(0, TURN_TEXT_MAX_LENGTH),
+                thrownAway
+              }
             });
+            if (card && reportId) cardReportIds.set(card, reportId);
+            reportPlaybackFor(reportId);
           }
           if (manualProcessingToken === conversationToken) {
             processing = false;
@@ -7595,7 +8359,8 @@
       // Push to Talk, two ways on the same button. A tap starts a recording
       // and the next tap stops it and translates. A press that is held
       // records for as long as it is held and translates when the finger
-      // lifts (onMicPressEnd). Either way the recording starts the moment
+      // lifts (onMicPressEnd); a finger lifted before the microphone was
+      // open counts as a tap. Either way the recording starts the moment
       // the finger touches the button, so the button changes at once. (Space
       // on a keyboard is held while speaking.) On an iPhone only a tap or a
       // short press gets a buzz; see attachIPhoneTapTick.
@@ -7618,6 +8383,8 @@
 
         tapStartActive = true;
         const startToken = ++tapStartToken;
+        const pressedAt = performance.now();
+        recordingPressAt = pressedAt;
         if (
           idleInstructionMode === "too-short" ||
           idleInstructionMode === "no-audio" ||
@@ -7627,15 +8394,23 @@
           setIdleInstructionMode("default");
         }
 
-        if (!mediaStream) setMicPreparing(true);
+        const stopShowingPreparing = showMicPreparing(
+          () => tapStartActive && tapStartToken === startToken
+        );
         const prepareResult = await prepareRecordingStart();
+        stopShowingPreparing();
         if (tapStartToken === startToken || !isRecordingIntentActive()) setMicPreparing(false);
         if (!tapStartActive || tapStartToken !== startToken) {
+          // Tapped again before the microphone was open.
+          if (prepareResult?.action === MIC_PREPARE_RECORDING_ACTIONS.START_RECORDING) {
+            noteMissedPress("gave-up-opening", { micWaitMs: performance.now() - pressedAt });
+          }
           finalizePreparedMicrophoneAttempt(prepareResult);
           return;
         }
         tapStartActive = false;
         if (prepareResult?.action !== MIC_PREPARE_RECORDING_ACTIONS.START_RECORDING) {
+          noteUnstartedPress(prepareResult, pressedAt);
           finalizePreparedMicrophoneAttempt(prepareResult);
           return;
         }
@@ -7682,21 +8457,23 @@
       };
 
       // The finger that started a recording has lifted (or the phone took the
-      // touch away). A short press was a tap: the recording goes on. A held
-      // press ends here: stop and translate, or, if the microphone is still
-      // opening, give the start up.
+      // touch away). A tap, or a finger lifted before the recording had
+      // started: the recording goes on until the next tap. A press held on
+      // while recording ends here: stop and translate.
       const onMicPressEnd = (event) => {
         if (!micPress || event.pointerId !== micPress.pointerId) return;
-        const heldMs = performance.now() - micPress.startedAt;
+        const press = micPress;
         micPress = null;
-        if (heldMs < HOLD_TO_TALK_MS || activeVoiceMode !== "manual") return;
+        if (activeVoiceMode !== "manual" || !isRecording) return;
+        const held = pressHeldRecording({
+          pressedAt: press.pressedAt,
+          liftedAt: pointerEventTime(event),
+          recordingStartedAt
+        });
+        if (!held) return;
         // A held press sometimes still gets its click (and tick) as it lifts.
         holdSideButtons();
-        if (isRecording) {
-          void stopRecording();
-        } else if (tapStartActive) {
-          cancelTapStart();
-        }
+        void stopRecording();
       };
 
       // iPhones give web pages no way to vibrate (no navigator.vibrate). The
@@ -7779,7 +8556,7 @@
           // press; one that stops a recording is just a tap.
           micPress =
             micTapTicks && !isRecording && !tapStartActive
-              ? { pointerId: event.pointerId, startedAt: performance.now() }
+              ? { pointerId: event.pointerId, pressedAt: pointerEventTime(event) }
               : null;
           void onMicTap();
         });

@@ -240,6 +240,8 @@
     let rejectResult = null;
 
     let keepAliveTimer = null;
+    // Silent pieces sent while waiting (see describeWait).
+    let keepAlivesSent = 0;
     let readyDeadlineTimer = null;
     let firstAudioTimer = null;
     let turnTimer = null;
@@ -429,6 +431,7 @@
           return;
         }
         send(audioMessage(getSilentChunkBase64(), 24000));
+        keepAlivesSent += 1;
       }, keepAliveIntervalMs);
     }
 
@@ -781,6 +784,19 @@
       },
       ageMs: function () {
         return Date.now() - createdAt;
+      },
+      // How long the session has waited so far: since it was made, since
+      // it was connected (null while still connecting), and how many silent
+      // keep-alive pieces it was sent meanwhile. For the turn report: every
+      // answer whose voice stopped after a second (2026-11-17/18) came from
+      // the session kept waiting before the press, none from one made at it.
+      describeWait: function () {
+        const now = Date.now();
+        return {
+          ageMs: now - createdAt,
+          readyMs: readyAt ? now - readyAt : null,
+          keepAlives: keepAlivesSent
+        };
       },
       getLease: function () {
         return lease;

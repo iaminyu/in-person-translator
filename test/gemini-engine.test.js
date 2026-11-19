@@ -545,6 +545,11 @@ test("Stream endpoint serves a Gemini turn without calling the transcription mod
       () => postTurn(server)
     );
 
+    // The request's id comes first, before any answer (the page names the
+    // request in its turn report even if the answer never reaches it).
+    const accepted = events.shift();
+    assert.equal(accepted.type, "accepted");
+    assert.match(accepted.requestId, /^ul_translate-turn-stream_\d+_[0-9a-f]{12}$/);
     assert.deepEqual(
       events.map((event) => event.type),
       [

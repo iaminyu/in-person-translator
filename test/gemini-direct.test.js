@@ -649,6 +649,10 @@ test("a waiting session sends small keep-alive audio until the turn starts", asy
     const before = fake.seen.log.filter((entry) => entry === "keepalive").length;
     assert.ok(before >= 2, `expected keep-alives, saw ${before}`);
     assert.equal(fake.seen.log.includes("start"), false);
+    // The turn report is told how long it waited and what it was sent.
+    const waited = session.describeWait();
+    assert.equal(waited.keepAlives, before);
+    assert.ok(waited.readyMs >= 80 && waited.readyMs <= waited.ageMs, JSON.stringify(waited));
 
     session.begin();
     session.pushAudio(FRAME, 100);

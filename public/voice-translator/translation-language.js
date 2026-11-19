@@ -2,7 +2,8 @@
 //
 // Now and then the model answers in a language outside the chosen pair
 // (Chinese in, German or English out when the pair is Chinese and Thai), or
-// repeats the sentence in the language it was spoken in. Both are judged here
+// repeats the sentence in the language it was spoken in (alone, or before its
+// translation). These are judged here
 // by writing system alone, so only pairs whose writing systems differ can be
 // checked: Chinese and Thai yes, English and German no. When nothing can be
 // said for sure the answer is "unknown" and the translation is left alone.
@@ -151,11 +152,35 @@
   //   "ok"              written in one of the two languages, and not the one spoken
   //   "third-language"  written in neither of the two languages
   //   "not-translated"  written in the language it was spoken in
+  //   "partly-translated"  translated, but with words of the speaker's
+  //                     language in it that the speaker did not say
+  //   "much-shorter"    far shorter than what was heard: most of it was left
+  //                     out (see isMuchShorterThanHeard). `translationIncomplete`:
+  //                     the text stopped halfway, so its length says nothing.
   //   "unknown"         cannot be told (too short, same writing system, ...)
   function checkTranslationLanguage(input) {
     const options = input || {};
     const scriptsA = scriptsOf(options.languageA);
     const scriptsB = scriptsOf(options.languageB);
+    const verdict = checkWholeAnswer(options, scriptsA, scriptsB);
+    // Asked last, and only of an answer nothing else is held against: a
+    // sentence said back with a word changed stays "not-translated", which
+    // is what stops it while it is still arriving.
+    if (
+      (verdict === "ok" || verdict === "unknown") &&
+      leavesWordsUntranslated(options, measure(options.sourceText), scriptsA, scriptsB)
+    ) {
+      return "partly-translated";
+    }
+    // Judged by length alone, so for any pair, but after the language: an
+    // answer in the wrong language is that first.
+    if ((verdict === "ok" || verdict === "unknown") && isMuchShorterThanHeard(options)) {
+      return "much-shorter";
+    }
+    return verdict;
+  }
+
+  function checkWholeAnswer(options, scriptsA, scriptsB) {
     const pairScripts = scriptsA.concat(scriptsB);
     const translated = measure(options.translatedText);
     const source = measure(options.sourceText);
@@ -172,16 +197,222 @@
     }
 
     const translatedSide = sideOf(translated, scriptsA, scriptsB);
-    if (!translatedSide) return "unknown";
     const sourceSide = sideOf(source, scriptsA, scriptsB);
-    if (sourceSide && sourceSide === translatedSide) return "not-translated";
+    if (translatedSide && sourceSide === translatedSide) return "not-translated";
+    if (sourceSide && saysSentenceBack(options, sourceSide === "A" ? scriptsA : scriptsB, sourceSide === "A" ? scriptsB : scriptsA)) {
+      return "not-translated";
+    }
+    if (!translatedSide) return "unknown";
     return "ok";
+  }
+
+  // Writing of one kind only, letters and characters alone.
+  function textInScripts(text, scripts) {
+    let kept = "";
+    for (const char of stripMarkers(text)) {
+      for (let i = 0; i < SCRIPT_RANGES.length; i += 1) {
+        if (SCRIPT_RANGES[i][1].test(char)) {
+          if (scripts.indexOf(SCRIPT_RANGES[i][0]) !== -1) kept += char;
+          break;
+        }
+      }
+    }
+    return kept;
+  }
+
+  function pairsOf(text) {
+    const chars = Array.from(text);
+    const pairs = [];
+    for (let i = 0; i + 1 < chars.length; i += 1) pairs.push(chars[i] + chars[i + 1]);
+    return pairs;
+  }
+
+  // The answer says the sentence back in the language it was spoken in and
+  // then (or first) translates it. Seen on 2026-11-18 with Chinese and Thai:
+  // "然后万一我偷偷跟别的女人聊天了怎么办呀?แล้วถ้าฉันแอบไปคุย...", the
+  // heard sentence word for word, then its Thai. Half of each, so the check
+  // above could not tell which language the answer was in.
+  //
+  // Judged by the speaker's own writing that the other language does not use
+  // (Chinese characters against Thai). It counts when the answer holds at
+  // least half of the heard sentence in it, made of the same runs of letters.
+  // Latin letters are not judged this way: an answer in Thai may rightly keep
+  // a long English name ("Samsung Galaxy S24 Ultra") from the sentence.
+  const SAID_BACK_SHARE_OF_HEARD = 0.5;
+  const SAID_BACK_MATCHING_PAIRS = 0.6;
+  function saysSentenceBack(options, sourceScripts, otherScripts) {
+    const ownScripts = sourceScripts.filter(function (script) {
+      return script !== "latin" && otherScripts.indexOf(script) === -1;
+    });
+    if (!ownScripts.length) return false;
+    const heard = textInScripts(options.sourceText, ownScripts);
+    const said = textInScripts(options.translatedText, ownScripts);
+    const heardWeight = measure(heard).total;
+    const saidWeight = measure(said).total;
+    if (saidWeight < MIN_WEIGHT || saidWeight < heardWeight * SAID_BACK_SHARE_OF_HEARD) {
+      return false;
+    }
+    const heardPairs = new Set(pairsOf(heard));
+    const saidPairs = pairsOf(said);
+    if (!saidPairs.length) return false;
+    let matching = 0;
+    for (let i = 0; i < saidPairs.length; i += 1) {
+      if (heardPairs.has(saidPairs[i])) matching += 1;
+    }
+    return matching / saidPairs.length >= SAID_BACK_MATCHING_PAIRS;
+  }
+
+  // Runs of writing of the given kinds, each a string of letters with
+  // nothing else between them.
+  // The Thai marks for "and so on" and "said twice" are not letters: a
+  // name may be written with or without them ("กรุงเทพฯ").
+  const THAI_SHORTHAND_MARK = /[\u0e2f\u0e46]/;
+  function runsInScripts(text, scripts) {
+    const runs = [];
+    let run = "";
+    for (const char of stripMarkers(text).normalize("NFKC")) {
+      let own = false;
+      for (let i = 0; i < SCRIPT_RANGES.length && !THAI_SHORTHAND_MARK.test(char); i += 1) {
+        if (SCRIPT_RANGES[i][1].test(char)) {
+          own = scripts.indexOf(SCRIPT_RANGES[i][0]) !== -1;
+          break;
+        }
+      }
+      if (own) {
+        run += char;
+      } else if (run) {
+        runs.push(run);
+        run = "";
+      }
+    }
+    if (run) runs.push(run);
+    return runs;
+  }
+
+  // The answer is a translation, but a word or two of it stayed in the
+  // speaker's language. Seen on 2026-11-18 with Chinese and Thai:
+  // "不着急不着急, 我就是想到了..." came back as "不用รีบนะครับ พอดี...",
+  // two Chinese characters and then Thai. Far too little Chinese for the
+  // checks on the whole answer to notice.
+  //
+  // A name kept as the speaker said it ("ฉันชื่อ 王小明") is a good
+  // translation, so only writing that is nowhere in the heard sentence
+  // counts: "不用" was never said, "王小明" was. A word left over that the
+  // speaker did say ("ฉัน还ยัง..." for "...我四级还没有过") is not caught.
+  //
+  // Only for pairs with no writing in common (Chinese and Thai), only when
+  // it is clear which of the two was spoken, and never for Latin letters,
+  // which turn up in any language.
+  function leavesWordsUntranslated(options, source, scriptsA, scriptsB) {
+    const shared = scriptsA.some(function (script) {
+      return scriptsB.indexOf(script) !== -1;
+    });
+    if (shared) return false;
+    const sourceSide = sideOf(source, scriptsA, scriptsB);
+    if (!sourceSide) return false;
+    const sourceScripts = (sourceSide === "A" ? scriptsA : scriptsB).filter(function (script) {
+      return script !== "latin";
+    });
+    const otherScripts = (sourceSide === "A" ? scriptsB : scriptsA).filter(function (script) {
+      return script !== "latin";
+    });
+    if (!sourceScripts.length || !otherScripts.length) return false;
+    // Not a translation at all is judged by the other checks.
+    if (!runsInScripts(options.translatedText, otherScripts).length) return false;
+    const leftOver = runsInScripts(options.translatedText, sourceScripts);
+    if (!leftOver.length) return false;
+    // What was heard, with everything but its own writing taken out, so a
+    // name is found whatever stood between its parts.
+    const heard = runsInScripts(options.sourceText, sourceScripts).join("");
+    for (let i = 0; i < leftOver.length; i += 1) {
+      if (heard.indexOf(leftOver[i]) === -1) return true;
+    }
+    return false;
+  }
+
+  // --- Length -----------------------------------------------------------
+  // How long a text takes to say at an ordinary pace, for comparing a
+  // translation with what was heard and with the recording. Measured on
+  // 2,620 saved answers to real Chinese and Thai speech (2026-11-18): at
+  // these rates a translation came out at 0.59x to 2.8x the length of the
+  // heard sentence (1 in 100 under 0.59x), and English (FLEURS) at 0.59x to
+  // 1.55x of the same sentence in Thai or Chinese. Other writing is not
+  // measured, so a text with much of it is not judged.
+  const SPEAKING_RATE = { han: 4.5, thai: 12, latin: 13, digit: 3 };
+  const HAN_LETTER = /\p{Script=Han}/u;
+  const THAI_LETTER = /\p{Script=Thai}/u;
+  const LATIN_LETTER = /\p{Script=Latin}/u;
+  const DIGIT = /\p{Nd}/u;
+  const NOT_SPOKEN = /[\s\p{P}\p{S}\p{M}]/u;
+  const MAX_UNMEASURED_SHARE = 0.1;
+
+  // Seconds at an ordinary pace, or null when too much of the text is in
+  // writing whose pace was not measured.
+  function speakingSeconds(text) {
+    let seconds = 0;
+    let letters = 0;
+    let unmeasured = 0;
+    for (const char of stripMarkers(text).normalize("NFC")) {
+      if (NOT_SPOKEN.test(char)) continue;
+      letters += 1;
+      if (HAN_LETTER.test(char)) seconds += 1 / SPEAKING_RATE.han;
+      else if (THAI_LETTER.test(char)) seconds += 1 / SPEAKING_RATE.thai;
+      else if (LATIN_LETTER.test(char)) seconds += 1 / SPEAKING_RATE.latin;
+      else if (DIGIT.test(char)) seconds += 1 / SPEAKING_RATE.digit;
+      else unmeasured += 1;
+    }
+    if (!letters || unmeasured / letters > MAX_UNMEASURED_SHARE) return null;
+    return seconds;
+  }
+
+  // A translation that holds a small part of what was heard: "就是成就感比较
+  // 低, 自己不会做题什么的, 然后导数也是。" came back as "แล้วก็เรื่องอนุพันธ์
+  // ด้วย" ("and the derivatives too"), 0.39x its length. Of the 2,620 saved
+  // answers, the two under 0.4x were both failures (the other answered "The
+  // audio is incomplete."); trial users' recordings show the same on the
+  // site, a 26-32 s sentence answered in about a second. Only for a heard
+  // sentence of 3 s or more, so a short reply ("好的" -> "OK") is never
+  // judged; text that is missing or stopped halfway is judged elsewhere.
+  const SHORTEST_SHARE_OF_HEARD = 0.4;
+  const MIN_HEARD_SECONDS_FOR_LENGTH = 3;
+  function isMuchShorterThanHeard(options) {
+    if (options.translationIncomplete) return false;
+    const translated = speakingSeconds(options.translatedText);
+    const heard = speakingSeconds(options.sourceText);
+    if (!translated || heard === null || heard < MIN_HEARD_SECONDS_FOR_LENGTH) return false;
+    return translated < SHORTEST_SHARE_OF_HEARD * heard;
+  }
+
+  // A translation far longer than anything that fits in the recording: the
+  // words were made up. On the site a 0.5 s press came back as 3.4 s of
+  // speech and a 2.6 s one as 23.6 s (trial users, Aug-Nov 2026). Over the
+  // 2,608 saved real recordings, no translation took more than 2.4x the
+  // recording's length to say; the allowance is wider still, and 1 s more
+  // for a short phrase that grows in translation ("加油" -> "Keep going, you
+  // can do it!").
+  const LONGEST_SHARE_OF_RECORDING = 2.5;
+  const RECORDING_ALLOWANCE_SECONDS = 1;
+  function isTooLongForRecording(input) {
+    const options = input || {};
+    const recordingSeconds = Number(options.recordingSeconds);
+    if (!Number.isFinite(recordingSeconds) || recordingSeconds <= 0) return false;
+    const translated = speakingSeconds(options.translatedText);
+    if (!translated) return false;
+    return (
+      translated >
+      LONGEST_SHARE_OF_RECORDING * recordingSeconds + RECORDING_ALLOWANCE_SECONDS
+    );
   }
 
   // True when the translation should be thrown away and made again.
   function isWrongLanguage(input) {
     const verdict = checkTranslationLanguage(input);
-    return verdict === "third-language" || verdict === "not-translated";
+    return (
+      verdict === "third-language" ||
+      verdict === "not-translated" ||
+      verdict === "partly-translated" ||
+      verdict === "much-shorter"
+    );
   }
 
   // While a translation is still arriving: true as soon as enough of it is
@@ -375,6 +606,8 @@
     isHeardTextOutsidePair: isHeardTextOutsidePair,
     isHeardSoFarOutsidePair: isHeardSoFarOutsidePair,
     isTurnOutsidePair: isTurnOutsidePair,
+    isTooLongForRecording: isTooLongForRecording,
+    speakingSeconds: speakingSeconds,
     recordingHasSound: recordingHasSound,
     MIC_SETTLE_MS: MIC_SETTLE_MS
   };

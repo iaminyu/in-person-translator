@@ -30,6 +30,30 @@ be said for sure, the answer is left alone.
 arriving: it is stopped as soon as its first words show it, instead of being
 read out to the end.
 
+**A word or two left untranslated.** "不着急不着急, 我就是想到了..." came back
+as "不用รีบนะครับ พอดี...": a translation, with two characters of the
+speaker's language at its start (2026-11-18). An answer holding writing of the
+speaker's language that is nowhere in the heard sentence is translated again.
+A name kept as it was said ("ฉันชื่อ 王小明") is in the heard sentence and is
+left alone; so, for now, is a left-over word the speaker did say. Only for
+pairs with no writing in common, and never for Latin letters.
+
+**Most of the sentence left out.** "就是成就感比较低, 自己不会做题什么的,
+然后导数也是。" came back as "แล้วก็เรื่องอนุพันธ์ด้วย", only its last clause. On the
+site, trial users' sentences of 26-32 s were answered in about a second of
+speech (2026-11). Both texts are measured in seconds at an ordinary pace
+(Chinese 4.5 characters, Thai 12 letters, Latin 13 letters a second); a
+translation under 0.4x the heard sentence is translated again. Only for a
+heard sentence of 3 s or more, only when the text arrived whole, and only
+for Chinese, Thai and Latin-script languages, whose pace was measured. This
+check needs no difference in writing, so it covers English and Spanish too.
+
+**A whole sentence from a brief press.** A 0.5 s press came back as 3.4 s of
+speech, a 2.6 s one as 23.6 s (trial users, Aug-Nov 2026). A translation
+that would take longer to say than 2.5x the recording plus 0.75 s is made
+up: no card, and the speaker is asked to say it again, as for a made-up
+heard sentence. Push to Talk only, where the recording's length is known.
+
 **Speech cut short.** Now and then the model speaks a second or less of a
 sentence while its text holds the whole of it (4 of 220 real turns on
 2026-11-16, on both paths). The length of the audio is compared with the
@@ -69,7 +93,13 @@ A card never stays on "Translating..." for good.
 Every check that can throw a turn away was replayed over the saved evaluation
 turns of real Chinese and Thai speech before it shipped. The "nothing of either
 language" rule: 1,907 turns, none dropped. The "heard in another language"
-rule, applied to every prefix of 1,898 turns: none stopped early.
+rule, applied to every prefix of 1,898 turns: none stopped early. The "word or
+two left untranslated" rule: 2,762 saved answers, 4 made again, each one
+holding Chinese words in a Thai answer; no kept name among them. The
+"most of it left out" rule (2026-11-18): of 2,142 saved answers long enough
+to judge, 1 made again, the one that kept only the last clause. The "brief
+press" rule: 2,608 saved recordings, none dropped; the longest translation
+needed 2.4x its recording.
 
 The page also reports to the server which check rejected a translation and the
 numbers it went by (counts only, never the words), so a check that starts

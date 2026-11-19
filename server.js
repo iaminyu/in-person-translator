@@ -294,6 +294,9 @@ app.post("/api/translate-turn-stream", limit("turn", 30), async (req, res) => {
   res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
   res.flushHeaders?.();
+  // First, so the page knows this request's id even if the answer never
+  // reaches it.
+  writeNdjson(res, { type: "accepted", requestId: turnId });
 
   let audioSent = false;
   let sourceText = "";
@@ -312,7 +315,10 @@ app.post("/api/translate-turn-stream", limit("turn", 30), async (req, res) => {
     let result = null;
     let engine = "";
     let geminiFailure = "";
-    if (geminiKey() && toTrimmedText(req.body?.engine).toLowerCase() !== "openai") {
+    // The page asks for "openai" once Gemini has stayed silent twice on this
+    // recording; without an OpenAI key Gemini is still asked.
+    const openaiAsked = openaiKey() && toTrimmedText(req.body?.engine).toLowerCase() === "openai";
+    if (geminiKey() && !openaiAsked) {
       try {
         result = await translateAudioTurnGemini({
           geminiApiKey: geminiKey(),

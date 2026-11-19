@@ -85,6 +85,13 @@ The page tries, in order:
    that fails or has not started speaking within 7 s, through OpenAI's realtime
    model (`translateAudioTurn`).
 
+When Gemini says nothing at all to a sentence, it does so on every session:
+five times on 2026-11-17/18 the first two were both silent, and so was the
+backup every time, and the server's own Gemini half the time; those sentences
+waited 9 to 16 s. So once two sessions have been silent on a recording, the
+backup is skipped and the server is asked to go straight to OpenAI
+(`engine: "openai"`, reported as path `server-openai`).
+
 A turn never changes engine once translated audio has started. After three
 turns in a row that the direct path could not finish at all (the server had to
 translate them) the page uses the server path for 60 s, then tries the direct
