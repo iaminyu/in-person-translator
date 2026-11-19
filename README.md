@@ -13,6 +13,10 @@ page to do.
 It is published so that face-to-face translation gets better everywhere, not
 only here. Take the code, the test method or just the lessons.
 
+Just want to use it? A hosted version runs at
+[livetalktranslate.com](https://livetalktranslate.com/), with nothing to set up
+and no API key of your own.
+
 ## What is in here
 
 | | |
@@ -54,6 +58,11 @@ on a phone, put the server behind HTTPS (a tunnel or a host) **and set
 spends your API quota. With the code set, each browser is asked for it once. Behind
 a tunnel or proxy also set `TRUST_PROXY=1`, so the built-in brakes count each
 visitor and not the proxy.
+
+At the foot of the page a small line says where this code comes from, with a
+link to the hosted version and one to this repository. You are welcome to
+remove it: set `HIDE_CREDIT=1`, or delete the `<footer id="credit">` element
+from `public/index.html`. The licence does not ask you to keep it.
 
 ### With an OpenAI key as well
 

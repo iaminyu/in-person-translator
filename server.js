@@ -8,6 +8,7 @@
 // There are no accounts and nothing is counted. Anyone who can reach this
 // server spends your API quota: set ACCESS_CODE before putting it online.
 
+const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const express = require("express");
@@ -175,6 +176,14 @@ app.use((req, res, next) => {
 
 // A minute of 24 kHz PCM16 is about 3.9 MB as base64.
 app.use(express.json({ limit: "8mb" }));
+// The line at the foot of the page that says where this code comes from.
+// HIDE_CREDIT=1 leaves it out; deleting it from public/index.html works too.
+if (/^(1|true|yes)$/i.test(toTrimmedText(process.env.HIDE_CREDIT))) {
+  const page = fs
+    .readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf8")
+    .replace(/([ \t]*<!--[^\n]*-->\n)?[ \t]*<footer id="credit"[\s\S]*?<\/footer>\n?/, "");
+  app.get(["/", "/index", "/index.html"], (req, res) => res.type("html").send(page));
+}
 app.use(express.static(PUBLIC_DIR, { extensions: ["html"] }));
 
 app.get("/api/health", (req, res) => {
